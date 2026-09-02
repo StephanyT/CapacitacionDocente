@@ -53,7 +53,15 @@
       </div>
       <a href="mentores.html" class="btn btn-outline btn-sm"><i class="fa-solid fa-people-group"></i> Buscar mentor</a>
     </div>
-    <!-- Los siguientes bloques (stats, ciclo, avance, etc.) se agregan despues -->
+    <!-- BLOQUE 3: Stats (Asignadas / Completadas / En curso / Pendientes) -->
+    <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);margin:-.35rem 0 .5rem;">Tus capacitaciones</p>
+    <div class="profile-stats stagger">
+      <div class="card metric"><div class="num" id="statAsignadas">0</div><div class="lbl">Asignadas</div></div>
+      <div class="card metric"><div class="num" id="statCompletadas">0</div><div class="lbl">Completadas</div></div>
+      <div class="card metric"><div class="num" id="statEnCurso">0</div><div class="lbl">En curso</div></div>
+      <div class="card metric"><div class="num" id="statPendientes">0</div><div class="lbl">Pendientes</div></div>
+    </div>
+    <!-- Los siguientes bloques (ciclo, avance, sobre mi, etc.) se agregan despues -->
   </main>
 </div>
 
@@ -80,6 +88,14 @@
   document.getElementById("avatar").textContent = docente.nombres[0] + docente.apellidos[0];
   document.getElementById("nombreCompleto").textContent = docente.nombres + " " + docente.apellidos;
   document.getElementById("miniInsignias").innerHTML = `${insigniasGanadas} de ${insigniasTotal} insignias · <a href="mi_progreso.html" style="color:var(--info);">Ver mi progreso</a>`;
+
+  // BLOQUE 3: stats de capacitaciones. Tambien numeros de prueba por ahora,
+  // porque INSCRIPCIONES esta vacio en data.js -- cuando se cargue esa data
+  // real, esto se calcula filtrando INSCRIPCIONES por id_docente y estado.
+  animateCount(document.getElementById("statAsignadas"), 10);
+  animateCount(document.getElementById("statCompletadas"), 6);
+  animateCount(document.getElementById("statEnCurso"), 2);
+  animateCount(document.getElementById("statPendientes"), 2);
 </script>
 </body>
 </html>
