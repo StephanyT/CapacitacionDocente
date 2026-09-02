@@ -30,7 +30,6 @@
     </div>
     <button type="button" class="login-submit" onclick="ingresar()">Acceder</button>
     <a href="#" class="login-forgot">¿Has olvidado tu contraseña?</a>
-    <p id="msgError" style="font-size:12px;margin-top:10px;display:none;"></p>
   </div>
 </div>
 
@@ -62,12 +61,15 @@
     document.getElementById("btnDocente").classList.remove("active");
   });
 
+  // Ya existen las paginas de cada panel (aunque todavia solo tengan el
+  // navbar armado), asi que "Acceder" navega de verdad a la primera pagina
+  // de ese rol, en vez de solo mostrar un mensaje.
   function ingresar(){
-    const msg = document.getElementById("msgError");
-    const rolTexto = rolSeleccionado === "docente" ? "Docente" : "Administrador";
-    msg.style.color = "#64a44e";
-    msg.textContent = `Entrarias al panel de ${rolTexto}. Asi seguira el flujo una vez conectemos los datos reales.`;
-    msg.style.display = "block";
+    if(rolSeleccionado === "docente"){
+      window.location.href = "docente/perfil.html";
+    } else {
+      window.location.href = "admin/dashboard.html";
+    }
   }
 </script>
 </body>
