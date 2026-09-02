@@ -33,8 +33,34 @@
   </nav>
 
   <main class="main">
-    <!-- Contenido de la pagina: se construye despues. Por ahora solo el navbar. -->
+    <!-- BLOQUE 1: Topbar (saludo) + Hero (especialidad y experiencia) -->
+    <div class="topbar"><h1>Hola, <span id="nombreTopbar"></span></h1></div>
+
+    <div class="profile-hero">
+      <div class="profile-hero-top">
+        <div>
+          <span class="especialidad-tag" id="pEspecialidad"><i class="fa-solid fa-bullseye"></i></span>
+        </div>
+        <div class="especialidad-tag" id="pExperiencia"><i class="fa-solid fa-briefcase"></i></div>
+      </div>
+    </div>
+    <!-- Los siguientes bloques (tarjeta de perfil, stats, etc.) se agregan despues -->
   </main>
 </div>
+
+<script src="../js/data.js"></script>
+<script src="../js/app.js"></script>
+<script>
+  // BLOQUE 1: por ahora usamos un docente fijo de prueba (id 1) en vez de
+  // requireSesion("docente"), porque login.html todavia no guarda la sesion
+  // real (eso lo conecta tu companero). Cuando lo haga, esta linea cambia a:
+  //   const sesion = requireSesion("docente");
+  //   const docente = DOCENTES.find(d => d.id === sesion.id);
+  const docente = DOCENTES.find(d => d.id === 1);
+
+  document.getElementById("nombreTopbar").textContent = docente.nombres;
+  document.getElementById("pEspecialidad").innerHTML = `<i class="fa-solid fa-bullseye"></i> ${docente.especialidad}`;
+  document.getElementById("pExperiencia").innerHTML = `<i class="fa-solid fa-briefcase"></i> ${docente.anios_experiencia} anos de experiencia`;
+</script>
 </body>
 </html>
