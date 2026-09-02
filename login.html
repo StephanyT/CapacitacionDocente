@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="icon" type="image/x-icon" href="img/favicon_certus.ico">
+<title>CERTUS | Iniciar sesion</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo-row">
+      <img src="img/certus_logo.png" alt="CERTUS">
+    </div>
+
+    <div class="role-toggle">
+      <button type="button" id="btnDocente" class="active">Docente</button>
+      <button type="button" id="btnAdmin">Administrador</button>
+    </div>
+
+    <input type="email" id="correo" placeholder="correo@certus.edu.pe">
+    <div class="login-pass-wrap">
+      <input type="password" id="clave" placeholder="Contrasena">
+      <button type="button" class="login-pass-toggle" id="togglePass" aria-label="Mostrar contraseña"><i class="fa-regular fa-eye"></i></button>
+    </div>
+    <button type="button" class="login-submit" onclick="ingresar()">Acceder</button>
+    <a href="#" class="login-forgot">¿Has olvidado tu contraseña?</a>
+    <p id="msgError" style="font-size:12px;margin-top:10px;display:none;"></p>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+<script>
+  // Mostrar/ocultar contrasena, como el ojo del campo de contrasena real del campus.
+  document.getElementById("togglePass").addEventListener("click", () => {
+    const clave = document.getElementById("clave");
+    const icono = document.querySelector("#togglePass i");
+    const visible = clave.type === "text";
+    clave.type = visible ? "password" : "text";
+    icono.className = visible ? "fa-regular fa-eye" : "fa-regular fa-eye-slash";
+  });
+
+  // Esta carpeta es solo el punto de partida visual para el equipo (sin
+  // datos todavia), asi que el login no valida nada: el toggle elige el rol
+  // y "Acceder" siempre funciona, para que se entienda el flujo sin
+  // necesitar credenciales reales.
+  let rolSeleccionado = "docente";
+  document.getElementById("btnDocente").addEventListener("click", () => {
+    rolSeleccionado = "docente";
+    document.getElementById("btnDocente").classList.add("active");
+    document.getElementById("btnAdmin").classList.remove("active");
+  });
+  document.getElementById("btnAdmin").addEventListener("click", () => {
+    rolSeleccionado = "admin";
+    document.getElementById("btnAdmin").classList.add("active");
+    document.getElementById("btnDocente").classList.remove("active");
+  });
+
+  function ingresar(){
+    const msg = document.getElementById("msgError");
+    const rolTexto = rolSeleccionado === "docente" ? "Docente" : "Administrador";
+    msg.style.color = "#64a44e";
+    msg.textContent = `Entrarias al panel de ${rolTexto}. Asi seguira el flujo una vez conectemos los datos reales.`;
+    msg.style.display = "block";
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,731 @@
+:root{
+  --navy:#00205B;
+  --navy-dark:#001640;
+  --success:#64a44e;
+  --warning:#f0ad4e;
+  --danger:#ca3120;
+  --info:#008196;
+  --secondary:#ced4da;
+  --gray:#6a737b;
+  --gray-dark:#343a40;
+  --bg:#F4F5F7;
+  --white:#ffffff;
+  --radius:10px;
+  --surface:#ffffff;
+  --text:#343a40;
+  --text-muted:#6a737b;
+  --border-color:#eeeeee;
+  color-scheme:light;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  font-family:'Roboto','Segoe UI',Arial,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  animation:fadeIn .35s ease;
+  transition:background .25s ease, color .25s ease;
+}
+a{text-decoration:none;color:inherit;}
+ul{list-style:none;}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+@keyframes slideUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+@keyframes toastIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+
+/* ===== LOGIN =====
+   Medidas, colores y tipografia que se asemejan al campus*/
+.login-wrap{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:2rem;
+  /* El campus real no centra el fondo: lo ancla arriba-izquierda
+     (background-position: 0% 0%, verificado en DevTools), no al centro */
+  background:url("../img/fondo_login.png");
+  background-size:cover;
+  background-position:0% 0%;
+}
+.login-card{
+  background:rgba(255,255,255,.2);
+  border-radius:8px;
+  box-shadow:0 8px 16px rgba(0,0,0,.15);
+  /* El padding real no es parejo, o sea 32px arriba/abajo pero 47px a los lados*/
+  padding:32px 47px;
+  /* El ancho real del campus no es fijo: escala con la ventana (medido en
+     DevTools: ~488px @1280px, ~522px @1366px, ~744px @1920px de viewport,
+     osea ~38.7% del ancho). Se replica con clamp() en vez de un px fijo. */
+  width:clamp(420px, 38.7vw, 800px);
+  max-width:100%;
+  text-align:center;
+  /* El campus real no centra la tarjeta a la perfección: tiene un
+     margin-bottom de 32px que la sube ~16px del centro exacto. */
+  margin-bottom:32px;
+}
+.login-logo-row{display:flex;align-items:center;justify-content:center;margin-bottom:28px;}
+/* En el campus real el logo es "img-fluid": escala con el ancho de la
+   tarjeta (86.9px de alto @1536px, 68.9px @1280px, etc — no un tamano fijo).
+   Nuestro logo no trae el texto "CAMPUS DIGITAL" (es mas cuadrado, 398x120
+   contra 1320x231 del original), asi que se escala por % del ancho de la
+   tarjeta en vez de copiar el mismo ancho, para que crezca en pantallas
+   grandes sin quedar gigante. */
+.login-logo-row img{width:34%;max-width:230px;height:auto;display:block;}
+/* Toggle Docente/Administrador — solo existe en esta carpeta de arranque
+   (sin datos reales), para que el equipo vea que habra dos flujos distintos. */
+.login-card .role-toggle{display:flex;gap:8px;margin-bottom:16px;}
+.login-card .role-toggle button{
+  flex:1;background:rgba(255,255,255,.55);color:var(--gray-dark);font-weight:600;
+  padding:8px;border-radius:9.6px;border:none;cursor:pointer;font-family:'Roboto',sans-serif;
+  transition:background .15s ease, color .15s ease;
+}
+.login-card .role-toggle button.active{background:var(--navy);color:#fff;}
+.login-card input{
+  width:100%;height:46px;padding:8px 16px;margin-bottom:16px;box-sizing:border-box;
+  border:1px solid #8F959E;border-radius:9.6px;font-size:18.75px;
+  background:#fff;color:#495057;font-family:'Roboto',sans-serif;
+  transition:border-color .15s ease, box-shadow .15s ease;
+}
+.login-card input:focus{outline:none;border-color:var(--navy);box-shadow:0 0 0 3px rgba(0,32,91,.18);}
+.login-pass-wrap{display:flex;margin-bottom:16px;}
+.login-card .login-pass-wrap input{
+  margin-bottom:0;border-radius:9.6px 0 0 9.6px;border-right:none;
+}
+.login-card .login-pass-toggle{
+  width:44.8px;flex-shrink:0;padding:0;cursor:pointer;font-size:15px;
+  border:1px solid #ced4da;border-left:none;background:#ced4da;color:#1d2125;
+  border-radius:0 9.6px 9.6px 0;display:flex;align-items:center;justify-content:center;
+  transition:background .15s ease;
+}
+.login-card .login-pass-toggle:hover{background:#c3cad2;}
+.login-submit{
+  width:100%;height:46px;padding:8px 16px;margin-bottom:16px;box-sizing:border-box;
+  background:var(--navy);color:#fff;border:1px solid var(--navy);border-radius:9.6px;
+  font-size:18.75px;font-family:'Roboto',sans-serif;cursor:pointer;
+  transition:background .15s ease, box-shadow .15s ease;
+}
+.login-submit:hover{background:var(--navy-dark);box-shadow:0 4px 14px rgba(0,32,91,.25);}
+.login-submit:active{transform:scale(.99);}
+.login-forgot{display:block;font-size:15px;color:var(--navy);}
+.login-forgot:hover{text-decoration:underline;}
+@media(max-width:520px){.login-card{padding:24px;}}
+
+/* ===== LAYOUT ===== */
+.app{display:flex;flex-direction:column;min-height:100vh;}
+.main{flex:1;width:100%;max-width:1100px;margin:0 auto;padding:1.75rem 2rem;animation:slideUp .3s ease;}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:.75rem;}
+.topbar h1{font-size:20px;color:var(--navy);font-weight:700;}
+
+/* ===== NAVBAR SUPERIOR =====
+   Patron tomado del navbar real del campus CERTUS (logo en pildora + separador
+   + etiqueta de seccion a la izquierda, links de navegacion, e iconos de
+   acciones + avatar a la derecha) — aqui adaptado solo con lo necesario para
+   el caso docente/admin (sin los enlaces de estudiante del campus real, que
+   no aplican a este panel). Reemplaza el sidebar lateral que tenia el
+   prototipo antes. */
+.topnav{
+  background:var(--navy);color:#fff;display:flex;align-items:center;gap:1.5rem;
+  padding:0 2.7rem;height:70px;flex-shrink:0;position:sticky;top:0;z-index:50;
+  box-shadow:0 2px 10px rgba(0,0,0,.12);
+}
+.topnav-left{display:flex;align-items:center;gap:9px;flex-shrink:0;white-space:nowrap;}
+.brand-logo{height:24px;width:auto;flex-shrink:0;display:block;}
+.brand-divider{width:1px;height:20px;background:rgba(255,255,255,.3);flex-shrink:0;}
+.brand-label{font-size:14.46px;font-weight:700;color:#fff;letter-spacing:.2px;text-transform:uppercase;white-space:nowrap;}
+.topnav-links{display:flex;align-items:center;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none;height:100%;}
+.topnav-links::-webkit-scrollbar{display:none;}
+.topnav-links a{
+  display:flex;align-items:center;white-space:nowrap;height:100%;padding:0 12px;
+  font-size:14.46px;font-weight:600;color:#c9d3e8;border-bottom:2px solid transparent;
+  transition:color .15s ease, border-color .15s ease;
+}
+.topnav-links a:hover{color:#fff;}
+.topnav-links a.active{color:#fff;font-weight:700;border-bottom-color:#fff;}
+.topnav-right{display:flex;align-items:center;gap:4px;flex-shrink:0;}
+.topnav-icon-btn{
+  width:36px;height:36px;border-radius:50%;border:none;background:transparent;color:#c9d3e8;
+  display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;
+  transition:background .15s ease, color .15s ease;font-family:inherit;position:relative;
+}
+.topnav-icon-btn:hover{background:rgba(255,255,255,.14);color:#fff;}
+.topnav-avatar-wrap{position:relative;margin-left:4px;}
+.topnav-avatar{
+  width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.18);color:#fff;
+  font-size:12px;font-weight:700;border:none;font-family:inherit;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:background .15s ease;
+}
+.topnav-avatar:hover{background:rgba(255,255,255,.3);}
+.topnav-avatar-dropdown{
+  display:none;position:absolute;top:44px;right:0;width:200px;
+  background:var(--surface);border:1px solid var(--border-color);border-radius:12px;
+  box-shadow:0 20px 45px rgba(0,20,60,.18);z-index:60;overflow:hidden;animation:slideUp .2s ease;
+}
+.topnav-avatar-dropdown.open{display:block;}
+.topnav-avatar-dropdown .dd-head{padding:12px 14px;border-bottom:1px solid var(--border-color);}
+.topnav-avatar-dropdown .dd-head b{display:block;font-size:13px;color:var(--text);}
+.topnav-avatar-dropdown .dd-head span{font-size:11px;color:var(--text-muted);}
+.topnav-avatar-dropdown a{
+  display:flex;align-items:center;gap:10px;padding:10px 14px;font-size:13px;color:var(--text);
+  transition:background .12s ease;
+}
+.topnav-avatar-dropdown a:hover{background:var(--bg);}
+@media(max-width:820px){
+  .brand-label{display:none;}
+  .topnav{padding:0 1.25rem;gap:1rem;}
+  .topnav-links a{padding:0 9px;font-size:12px;}
+}
+
+/* ===== CARDS ===== */
+.card{background:var(--surface);border-radius:var(--radius);padding:1.25rem;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:1.25rem;transition:box-shadow .2s ease, transform .2s ease, background .25s ease;animation:slideUp .35s ease backwards;}
+.card h2{font-size:15px;color:var(--navy);margin-bottom:.75rem;font-weight:700;display:flex;align-items:center;gap:8px;}
+.card h2 i{color:var(--info);}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;}
+.metric{text-align:center;}
+.metric:hover{box-shadow:0 6px 18px rgba(0,32,91,.1);transform:translateY(-2px);}
+.metric .icon-wrap{width:38px;height:38px;border-radius:10px;background:rgba(0,32,91,.08);color:var(--navy);display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:16px;}
+.metric .num{font-size:26px;font-weight:800;color:var(--navy);}
+.metric .label{font-size:12px;color:var(--gray);margin-top:2px;}
+
+/* ===== BUTTONS ===== */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:8px;border:none;font-size:13px;font-weight:600;cursor:pointer;
+  transition:transform .15s ease, box-shadow .15s ease, background .15s ease, opacity .15s ease;font-family:inherit;}
+.btn-primary{background:var(--navy);color:#fff;}
+.btn-primary:hover{background:var(--navy-dark);box-shadow:0 4px 14px rgba(0,32,91,.22);}
+.btn-outline{background:#fff;color:var(--navy);border:1px solid var(--navy);}
+.btn-outline:hover{background:rgba(0,32,91,.06);}
+.btn-sm{padding:6px 10px;font-size:12px;}
+.btn-danger{background:var(--danger);color:#fff;}
+.btn-danger:hover{opacity:.88;}
+.btn:active{transform:scale(.97);}
+
+/* ===== CHIPS / FILTROS ===== */
+.chips{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;}
+.chip{padding:6px 16px;border-radius:20px;font-size:13px;border:1px solid var(--secondary);background:#fff;cursor:pointer;color:var(--gray-dark);transition:all .15s ease;}
+.chip:hover{border-color:var(--navy);color:var(--navy);}
+.chip.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--secondary);border-radius:8px;padding:8px 12px;margin-bottom:1rem;font-size:13px;color:var(--gray);transition:border-color .15s ease, background .25s ease;}
+.search-box:focus-within{border-color:var(--navy);}
+.search-box i{color:var(--gray);}
+.search-box input{border:none;outline:none;flex:1;font-size:13px;font-family:inherit;}
+
+/* ===== TABLA ===== */
+table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:var(--radius);overflow:hidden;}
+th,td{text-align:left;padding:11px 12px;font-size:13px;border-bottom:1px solid var(--border-color);color:var(--text);}
+th{background:var(--bg);color:var(--text-muted);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.03em;}
+tbody tr{transition:background .12s ease;}
+tbody tr:hover{background:rgba(0,32,91,.04);}
+tbody tr:last-child td{border-bottom:none;}
+
+/* ===== TABLA CLAVE-VALOR (2-3 filas de datos, sin encabezado) =====
+   Bug real de UX: estas mini-tablas (datos de contacto, "Sobre mi", perfil
+   rapido de mentor) heredaban el estilo de tabla de datos completa —
+   fondo propio + bordes redondeados + overflow:hidden sobre solo 2-3 filas
+   se veia como una caja rara flotando dentro del modal/card que ya tiene su
+   propio fondo. Esta variante la deja como una simple lista de datos. */
+.table-kv{background:none;border-radius:0;}
+.table-kv td{padding:9px 0;border-bottom:1px solid var(--border-color);}
+.table-kv tr:last-child td{border-bottom:none;}
+.table-kv tr:hover td{background:none;}
+
+/* ===== BADGES DE ESTADO ===== */
+.badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;display:inline-block;}
+.badge-pendiente{background:#fdeedd;color:#8a5a1a;}
+.badge-curso{background:#e0f0fb;color:#0c5b8a;}
+.badge-completada{background:#e6f4e0;color:#3a6b2a;}
+.badge-vencido{background:#fbe2df;color:#8a2a1e;}
+
+/* ===== SEMAFORO ===== */
+.semaforo{width:12px;height:12px;border-radius:50%;display:inline-block;margin-right:6px;}
+.semaforo-verde{background:var(--success);}
+.semaforo-ambar{background:var(--warning);}
+.semaforo-rojo{background:var(--danger);}
+
+/* ===== INSIGNIAS ===== */
+.insignias-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;}
+.insignia{text-align:center;padding:1rem .5rem;border-radius:var(--radius);background:var(--surface);border:1px solid var(--border-color);transition:transform .15s ease, box-shadow .15s ease;}
+.insignia:hover{transform:translateY(-3px);box-shadow:0 8px 18px rgba(0,0,0,.08);}
+.insignia .icono{width:52px;height:52px;border-radius:50%;margin:0 auto .5rem;display:flex;align-items:center;justify-content:center;font-size:20px;}
+.insignia.ganada .icono{background:linear-gradient(135deg,var(--warning),#e0932a);color:#fff;box-shadow:0 4px 12px rgba(240,173,78,.35);}
+.insignia.bloqueada .icono{background:var(--bg);color:var(--text-muted);}
+.insignia .nombre{font-size:12px;font-weight:600;color:var(--text);}
+.insignia.bloqueada .nombre{color:var(--text-muted);}
+.insignia .requisito{display:block;font-size:10px;color:var(--text-muted);margin-top:3px;line-height:1.3;}
+.insignia.ganada .requisito{color:var(--success);font-weight:600;}
+
+/* ===== NIVEL / GAMIFICACION ===== */
+.nivel-tag{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,rgba(240,173,78,.15),rgba(0,129,150,.12));border:1px solid rgba(240,173,78,.35);color:var(--navy);font-size:11.5px;font-weight:700;padding:5px 13px;border-radius:20px;margin-bottom:.4rem;}
+.nivel-tag i{color:var(--warning);}
+
+/* ===== RUTA RECOMENDADA (roadmap visual) ===== */
+.ruta-cap-preview{display:flex;align-items:center;gap:12px;background:var(--bg);border-radius:10px;padding:.85rem 1rem;margin:.75rem 0 1rem;}
+.ruta-cap-preview .ruta-ic{width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,var(--navy),var(--info));color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.ruta-cap-preview .ruta-info b{display:block;font-size:13px;color:var(--text);}
+.ruta-cap-preview .ruta-info span{font-size:11px;color:var(--text-muted);}
+.ruta-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;}
+.ruta-chips span{font-size:10px;background:var(--surface);border:1px solid var(--border-color);color:var(--text-muted);padding:2px 8px;border-radius:12px;}
+
+/* ===== LISTA "PROXIMAS CAPACITACIONES" (clickeable) ===== */
+.proxima-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 8px;border-bottom:1px solid var(--border-color);font-size:13px;border-radius:8px;transition:background .15s ease, padding-left .15s ease;color:var(--text);}
+.proxima-item:last-child{border-bottom:none;}
+.proxima-item:hover{background:var(--bg);padding-left:12px;}
+.proxima-item .p-info b{display:block;color:var(--text);}
+.proxima-item .p-info span{font-size:11px;color:var(--text-muted);}
+.proxima-item .p-right{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.proxima-item i.fa-chevron-right{color:var(--text-muted);font-size:11px;}
+
+/* ===== CAPACITACIONES DISPONIBLES (RF-09: catalogo no asignado) ===== */
+.disponible-card{border:1px dashed var(--secondary);background:var(--bg);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+.disponible-card .d-tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);background:var(--surface);border:1px solid var(--border-color);padding:2px 9px;border-radius:10px;}
+.progress-bar{height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden;margin:.5rem 0 1rem;}
+.progress-bar span{display:block;height:100%;background:var(--success);}
+
+/* ===== MODAL ===== */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(6,14,35,.55);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  display:none;align-items:center;justify-content:center;z-index:50;
+  animation:fadeIn .18s ease;
+}
+.modal-overlay.open{display:flex;}
+.modal-box{
+  background:color-mix(in srgb, var(--surface) 88%, transparent);
+  border:1px solid rgba(255,255,255,.4);
+  border-radius:16px;padding:2rem;width:380px;max-width:92vw;text-align:center;
+  box-shadow:0 25px 60px rgba(0,10,40,.3);animation:slideUp .25s ease;
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  max-height:86vh;overflow-y:auto;
+}
+/* Bug real (RNF-01): 10 modales fijan su propio ancho inline (360-460px) sin
+   ningun limite — en un telefono de 360-375px de pantalla eso se desborda y
+   corta contenido. Al mover max-width:92vw a la regla base (antes solo la
+   variante .wide lo tenia), TODOS los modales quedan protegidos, sin tocar
+   cada uno por separado. max-height+overflow-y evita el mismo problema en
+   vertical con modales largos (ej. perfil de docente) en pantallas bajas. */
+.modal-box .icon-ok{width:60px;height:60px;border-radius:50%;background:var(--success);color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 1rem;}
+.modal-box h3{color:var(--navy);margin-bottom:.5rem;font-weight:700;}
+.modal-box p{color:var(--text-muted);font-size:13px;margin-bottom:1.25rem;}
+.modal-box.wide{width:540px;max-width:92vw;text-align:left;max-height:86vh;overflow-y:auto;}
+
+/* ===== PERFIL DE MENTOR (modal) ===== */
+.mentor-modal-head{display:flex;gap:1rem;align-items:center;margin-bottom:1.25rem;}
+.mentor-modal-head .avatar-lg{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--navy),var(--info));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;flex-shrink:0;}
+.mentor-modal-head h3{color:var(--navy);font-size:17px;margin-bottom:2px;}
+.mentor-modal-head span{font-size:12.5px;color:var(--text-muted);}
+.mentor-stats-row{display:flex;gap:1.5rem;margin-bottom:1rem;padding:.85rem 0;border-top:1px solid var(--border-color);border-bottom:1px solid var(--border-color);}
+.mentor-stats-row div{text-align:center;flex:1;}
+.mentor-stats-row b{display:block;font-size:16px;color:var(--navy);}
+.mentor-stats-row span{font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;}
+.mentor-bio{font-size:13px;color:var(--text);line-height:1.6;margin-bottom:1.1rem;}
+.mentor-modal-section h4{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:.6rem;font-weight:700;}
+.slot-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1.1rem;}
+.slot-chip{padding:7px 14px;border-radius:20px;font-size:12.5px;border:1px solid var(--secondary);background:var(--surface);color:var(--text);cursor:pointer;transition:all .15s ease;}
+.slot-chip:hover{border-color:var(--navy);}
+.slot-chip.selected{background:var(--navy);color:#fff;border-color:var(--navy);}
+.review-item{padding:.65rem 0;border-bottom:1px solid var(--border-color);}
+.review-item:last-child{border-bottom:none;}
+.review-item .r-head{display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:var(--text);margin-bottom:2px;}
+.review-item .r-stars{color:var(--warning);font-size:11px;}
+.review-item p{font-size:12.5px;color:var(--text-muted);margin:0;}
+.mentor-card{cursor:pointer;}
+
+/* ===== PERFIL DE DOCENTE ===== */
+.profile-hero{
+  position:relative;border-radius:16px;overflow:hidden;margin-bottom:1.25rem;
+  background:linear-gradient(120deg,var(--navy) 0%,#0c3a8f 55%,var(--info) 130%);
+  padding:2.75rem 2rem 4.25rem;color:#fff;
+}
+.profile-hero::before{content:"";position:absolute;width:260px;height:260px;border-radius:50%;background:rgba(240,173,78,.16);top:-100px;right:-60px;}
+.profile-hero::after{content:"";position:absolute;width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,.08);bottom:-90px;left:20%;}
+.profile-hero-top{position:relative;z-index:1;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;}
+.profile-hero-top .especialidad-tag{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px;}
+.profile-card{position:relative;margin:-3.5rem 1.5rem 1.25rem;background:var(--surface);border-radius:16px;padding:1.5rem 1.75rem;box-shadow:0 15px 40px rgba(0,32,91,.14);display:flex;gap:1.25rem;align-items:flex-end;flex-wrap:wrap;}
+.profile-avatar-xl{width:88px;height:88px;border-radius:50%;background:linear-gradient(135deg,var(--warning),#e0932a);color:#fff;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;border:4px solid var(--surface);margin-top:-3rem;box-shadow:0 6px 18px rgba(0,0,0,.15);flex-shrink:0;}
+.profile-card h2{font-size:19px;color:var(--navy);margin-bottom:2px;}
+.profile-card .sub-info{font-size:12.5px;color:var(--text-muted);}
+.profile-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.25rem;}
+.profile-stats .card{text-align:center;margin-bottom:0;}
+.profile-stats .card .num{font-size:22px;font-weight:800;color:var(--navy);}
+.profile-stats .card .lbl{font-size:11px;color:var(--text-muted);margin-top:2px;}
+.timeline{position:relative;padding-left:22px;}
+.timeline::before{content:"";position:absolute;left:6px;top:6px;bottom:6px;width:2px;background:var(--border-color);}
+.timeline-item{position:relative;padding-bottom:1.1rem;}
+.timeline-item:last-child{padding-bottom:0;}
+.timeline-item::before{content:"";position:absolute;left:-22px;top:3px;width:12px;height:12px;border-radius:50%;background:var(--success);border:2px solid var(--surface);}
+.timeline-item.pend::before{background:var(--secondary);}
+.timeline-item b{font-size:13px;color:var(--text);display:block;}
+.timeline-item span{font-size:11.5px;color:var(--text-muted);}
+
+/* ===== DETALLE DE CAPACITACION ===== */
+.detalle-hero{
+  position:relative;border-radius:16px;overflow:hidden;margin-bottom:1.25rem;padding:2rem 2rem 1.75rem;color:#fff;
+  background:linear-gradient(120deg,var(--navy) 0%,#0c3a8f 60%,var(--info) 140%);
+}
+.detalle-hero::before{content:"";position:absolute;width:220px;height:220px;border-radius:50%;background:rgba(240,173,78,.15);top:-90px;right:-40px;}
+.detalle-hero-top{position:relative;z-index:1;display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;}
+.detalle-hero h2{font-size:22px;font-weight:800;margin:.4rem 0 .5rem;position:relative;z-index:1;}
+.detalle-hero p{color:#d7deef;font-size:13px;max-width:600px;position:relative;z-index:1;line-height:1.6;}
+.detalle-pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:1rem;position:relative;z-index:1;}
+.detalle-pills span{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);padding:5px 12px;border-radius:20px;font-size:11.5px;display:inline-flex;align-items:center;gap:6px;}
+.info-side .row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border-color);font-size:12.5px;}
+.info-side .row:last-child{border-bottom:none;}
+.info-side .row span:first-child{color:var(--text-muted);}
+.info-side .row span:last-child{font-weight:600;color:var(--text);text-align:right;}
+.obj-list,.temario-list{list-style:none;padding:0;margin:0;}
+.obj-list li{display:flex;gap:10px;padding:7px 0;font-size:13px;color:var(--text);align-items:flex-start;}
+.obj-list li i{color:var(--success);margin-top:2px;flex-shrink:0;}
+.temario-list li{display:flex;gap:10px;padding:8px 0;font-size:13px;color:var(--text);align-items:center;border-bottom:1px solid var(--border-color);}
+.temario-list li:last-child{border-bottom:none;}
+.temario-num{width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.requisitos-box{background:var(--bg);border-left:3px solid var(--warning);border-radius:8px;padding:12px 14px;font-size:12.5px;color:var(--text);margin-top:.5rem;}
+
+/* ===== DETALLE v2: skill tags, tabs, acordeon, instructor, relacionadas ===== */
+.skill-tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:.85rem;position:relative;z-index:1;}
+.skill-tags span{background:rgba(240,173,78,.18);border:1px solid rgba(240,173,78,.4);color:#ffe3ac;padding:4px 11px;border-radius:20px;font-size:11px;font-weight:600;}
+
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--border-color);margin-bottom:1.1rem;flex-wrap:wrap;}
+.tab-btn{background:none;border:none;padding:10px 16px;font-size:13px;font-weight:700;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s ease;display:flex;align-items:center;gap:7px;}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--navy);border-bottom-color:var(--navy);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;animation:slideUp .3s ease backwards;}
+
+.aprenderas-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.aprenderas-item{display:flex;gap:9px;font-size:13px;color:var(--text);align-items:flex-start;background:var(--bg);border-radius:10px;padding:10px 12px;}
+.aprenderas-item i{color:var(--success);margin-top:2px;flex-shrink:0;}
+
+.checklist-progreso{display:flex;align-items:center;gap:10px;margin-bottom:.9rem;}
+.checklist-progreso .bar{flex:1;height:8px;border-radius:6px;background:var(--bg);overflow:hidden;}
+.checklist-progreso .bar-fill{height:100%;background:var(--success);border-radius:6px;transition:width .3s ease;}
+.checklist-progreso b{font-size:12px;color:var(--text);white-space:nowrap;}
+.checklist-note{font-size:11px;color:var(--text-muted);margin-bottom:1rem;display:flex;gap:6px;align-items:flex-start;line-height:1.5;}
+
+.accordion-item{border:1px solid var(--border-color);border-radius:10px;margin-bottom:8px;overflow:hidden;}
+.accordion-header{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;background:var(--bg);font-size:13px;font-weight:600;color:var(--text);}
+.accordion-header input[type=checkbox]{width:16px;height:16px;accent-color:var(--success);cursor:pointer;flex-shrink:0;}
+.accordion-header .chev{margin-left:auto;color:var(--text-muted);transition:transform .2s ease;font-size:11px;}
+.accordion-item.open .chev{transform:rotate(180deg);}
+.accordion-body{max-height:0;overflow:hidden;transition:max-height .25s ease;}
+.accordion-item.open .accordion-body{max-height:280px;}
+.accordion-body-inner{padding:12px 14px;font-size:12.5px;color:var(--text-muted);line-height:1.6;border-top:1px solid var(--border-color);}
+.temario-num.done{background:var(--success);color:#fff;}
+.reflexion-label{display:block;font-size:11.5px;color:var(--text-muted);margin-bottom:6px;font-weight:600;}
+.reflexion-input{width:100%;border:1px solid var(--border-color);border-radius:8px;padding:8px 10px;font-family:inherit;font-size:12.5px;color:var(--text);background:var(--surface);resize:vertical;margin-bottom:6px;box-sizing:border-box;}
+.reflexion-input:focus{outline:none;border-color:var(--navy);}
+.reflexion-hint{font-size:10.5px;color:var(--text-muted);display:flex;align-items:center;gap:5px;}
+
+.instructor-card{display:flex;gap:16px;align-items:flex-start;}
+.instructor-avatar{width:64px;height:64px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;flex-shrink:0;}
+.instructor-card h3{font-size:15px;margin-bottom:2px;color:var(--text);}
+.instructor-card .rol{font-size:12px;color:var(--text-muted);margin-bottom:8px;display:block;}
+.instructor-card p{font-size:12.5px;color:var(--text);line-height:1.6;}
+
+.sticky-side{position:sticky;top:1.25rem;}
+
+.related-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;}
+.related-card{background:var(--surface);border:1px solid var(--border-color);border-radius:12px;padding:14px;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease;}
+.related-card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.08);}
+.related-card .r-tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);background:var(--bg);border:1px solid var(--border-color);padding:2px 9px;border-radius:10px;display:inline-block;margin-bottom:8px;}
+.related-card h4{font-size:13px;color:var(--text);margin-bottom:6px;line-height:1.4;}
+.related-card span.meta{font-size:11px;color:var(--text-muted);display:block;}
+
+@media(max-width:760px){
+  .aprenderas-grid,.related-grid{grid-template-columns:1fr;}
+  .instructor-card{flex-direction:column;}
+  .sticky-side{position:static;}
+}
+
+/* ===== TOASTS (reemplazan alert()) ===== */
+.toast-container{position:fixed;bottom:20px;right:20px;display:flex;flex-direction:column;gap:10px;z-index:100;}
+.toast{
+  background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;
+  box-shadow:0 10px 25px rgba(0,0,0,.2);display:flex;align-items:center;gap:10px;
+  animation:toastIn .25s ease;min-width:220px;
+}
+.toast i{font-size:15px;}
+.toast.success{background:var(--success);}
+.toast.error{background:var(--danger);}
+.toast.info{background:var(--info);}
+
+/* ===== QR / CONSTANCIA (legacy, mantenido por compatibilidad) ===== */
+.constancia-card{display:flex;justify-content:space-between;align-items:center;}
+.constancia-card .qr-box{text-align:center;}
+.constancia-card .qr-box canvas{margin-bottom:6px;}
+.constancia-card .qr-box small{color:var(--gray);font-size:10px;display:block;}
+
+/* ===== DIPLOMA / CONSTANCIA LLAMATIVA ===== */
+.diploma-wrap{margin-bottom:1.75rem;}
+.diploma{
+  position:relative;background:
+    radial-gradient(circle at 100% 0%, rgba(240,173,78,.1), transparent 42%),
+    radial-gradient(circle at 0% 100%, rgba(0,129,150,.1), transparent 42%),
+    var(--surface);
+  border:2px solid var(--warning);border-radius:16px;padding:2.25rem 2rem 1.5rem;
+  overflow:hidden;box-shadow:0 22px 50px rgba(0,32,91,.16);
+  animation:slideUp .4s ease backwards;
+}
+.diploma::before{content:"";position:absolute;inset:8px;border:1px solid rgba(0,32,91,.28);border-radius:9px;pointer-events:none;}
+.diploma::after{
+  content:"\f19d";font-family:"Font Awesome 6 Free";font-weight:900;position:absolute;
+  right:-25px;bottom:-35px;font-size:190px;color:rgba(0,32,91,.045);pointer-events:none;line-height:1;
+}
+.diploma-head{text-align:center;position:relative;}
+.diploma-brandmark{display:inline-flex;align-items:center;gap:8px;font-weight:800;color:var(--navy);font-size:12px;letter-spacing:.1em;text-transform:uppercase;}
+.diploma-logo-chip{display:inline-flex;align-items:center;}
+.diploma-logo-chip img{
+  height:26px;width:auto;display:block;
+  /* Recolorea el logo (blanco con "CERTUS" hueco) a navy solido, para
+     que se lea sobre el fondo claro del diploma sin agregar una caja. */
+  filter:brightness(0) saturate(100%) invert(9%) sepia(54%) saturate(3767%) hue-rotate(206deg) brightness(92%) contrast(105%);
+}
+.diploma-tag{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted);margin:.9rem 0 .35rem;font-weight:700;}
+.diploma-nombre{font-size:27px;font-weight:800;color:var(--navy);margin-bottom:.4rem;}
+.diploma-sub{font-size:12.5px;color:var(--text-muted);max-width:440px;margin:0 auto .5rem;line-height:1.6;}
+.diploma-titulo{font-size:19px;font-weight:700;color:var(--info);text-align:center;margin:.35rem 0 1.4rem;}
+.diploma-meta{display:flex;justify-content:center;gap:2.25rem;flex-wrap:wrap;text-align:center;margin-bottom:1.5rem;position:relative;}
+.diploma-meta div span{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:2px;}
+.diploma-meta div b{font-size:13px;color:var(--text);}
+.diploma-footer{display:flex;justify-content:space-between;align-items:center;gap:1.25rem;flex-wrap:wrap;border-top:1px dashed rgba(0,32,91,.25);padding-top:1.25rem;position:relative;}
+.diploma-firma{text-align:center;font-size:11px;color:var(--text-muted);}
+.diploma-firma .linea{width:150px;border-top:1px solid var(--text-muted);margin:0 auto 6px;}
+.diploma-firma b{display:block;color:var(--text);font-size:12px;margin-top:2px;}
+.diploma-seal{width:64px;height:64px;border-radius:50%;background:conic-gradient(from 0deg,var(--warning),#e0932a,var(--warning));display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;box-shadow:0 4px 12px rgba(0,0,0,.15);}
+.diploma-seal::before{content:"";position:absolute;inset:5px;border-radius:50%;background:var(--navy);}
+.diploma-seal i{position:relative;color:#fff;font-size:18px;}
+.diploma-qr{text-align:center;background:var(--bg);border-radius:10px;padding:10px 12px;}
+.diploma-qr small{display:block;color:var(--text-muted);font-size:9px;margin-top:4px;}
+.diploma-qr .codigo{font-size:10px;color:var(--text-muted);margin-top:3px;font-family:monospace;}
+.diploma-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:.85rem;}
+@media(max-width:700px){.diploma-footer{flex-direction:column;align-items:center;text-align:center;}}
+
+/* ===== GALERIA DE CONSTANCIAS (previews clickeables) ===== */
+.constancias-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.1rem;}
+@media(max-width:900px){.constancias-grid{grid-template-columns:1fr 1fr;}}
+.constancia-preview{
+  background:var(--surface);border:1px solid var(--border-color);border-radius:14px;padding:1.35rem 1.1rem;
+  text-align:center;cursor:pointer;transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;position:relative;overflow:hidden;
+}
+.constancia-preview:hover{transform:translateY(-4px);box-shadow:0 14px 32px rgba(0,32,91,.14);border-color:rgba(240,173,78,.5);}
+.constancia-preview::before{
+  content:"";position:absolute;inset:0;border:2px solid transparent;border-radius:14px;
+  background:linear-gradient(135deg,rgba(240,173,78,.5),rgba(0,129,150,.4)) border-box;
+  -webkit-mask:linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;opacity:0;transition:opacity .18s ease;
+}
+.constancia-preview:hover::before{opacity:1;}
+.constancia-preview .ribbon{width:46px;height:46px;border-radius:50%;background:conic-gradient(from 0deg,var(--warning),#e0932a,var(--warning));display:flex;align-items:center;justify-content:center;margin:0 auto .75rem;position:relative;}
+.constancia-preview .ribbon::before{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--navy);}
+.constancia-preview .ribbon i{position:relative;color:#fff;font-size:15px;}
+.constancia-preview b{display:block;font-size:13.5px;color:var(--text);margin-bottom:4px;line-height:1.35;}
+.constancia-preview .fecha{font-size:11px;color:var(--text-muted);display:block;margin-bottom:2px;}
+.constancia-preview .codigo{font-size:10px;color:var(--text-muted);font-family:monospace;display:block;}
+.constancia-preview .hint{display:block;margin-top:.6rem;font-size:11px;color:var(--info);font-weight:600;}
+.diploma-modal-inner{width:600px;max-width:92vw;max-height:88vh;overflow-y:auto;padding:0;background:transparent;border:none;box-shadow:none;}
+.diploma-modal-inner .diploma-actions{justify-content:center;}
+
+/* ===== FORM ===== */
+.form-group{margin-bottom:1rem;}
+.form-group label{display:block;font-size:12px;color:var(--gray);margin-bottom:4px;}
+.form-group input,.form-group select,.form-group textarea{
+  width:100%;padding:9px 11px;border:1px solid var(--secondary);border-radius:8px;font-size:13px;
+  font-family:inherit;transition:border-color .15s ease, box-shadow .15s ease, background .25s ease;
+  background:var(--surface);color:var(--text);
+}
+.form-group label{color:var(--text-muted);}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{
+  outline:none;border-color:var(--navy);box-shadow:0 0 0 3px rgba(0,32,91,.1);
+}
+
+/* ===== MENTORES ===== */
+.mentor-card{display:flex;justify-content:space-between;align-items:center;}
+.mentor-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.08);}
+.mentor-card .info b{display:block;font-size:14px;}
+.mentor-card .info span{font-size:12px;color:var(--gray);}
+.mentor-card .avatar{width:40px;height:40px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;margin-right:12px;}
+
+@media(max-width:900px){
+  .grid-2,.grid-3,.grid-4,.insignias-grid,.profile-stats{grid-template-columns:1fr 1fr;}
+}
+
+/* BUG real de UX/responsive encontrado: .grid-2 (el layout mas usado en todo
+   el proyecto para emparejar tarjetas) nunca colapsaba a 1 columna en
+   pantallas de celular — se quedaba forzado en 2 columnas angostas sin
+   importar cuan chico fuera el viewport. Se agrega este breakpoint dedicado
+   a celulares para que las tarjetas se apilen y sean legibles. */
+@media(max-width:640px){
+  .grid-2,.grid-3,.grid-4,.profile-stats{grid-template-columns:1fr;}
+  .insignias-grid{grid-template-columns:repeat(2,1fr);}
+  /* Bug real: las tablas (Reportes con 9 columnas, Gestion de docentes,
+     Sesiones de mentoria, etc.) no tenian ninguna salida en celular — las
+     columnas se aplastaban ilegibles porque el ancho del contenedor nunca
+     alcanza. display:block+overflow-x:auto conserva el ancho natural de
+     cada columna y agrega scroll horizontal solo cuando hace falta. */
+  table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;}
+}
+
+/* ===== INSIGHT CARD (resumen inteligente) ===== */
+.insight-card{
+  background:linear-gradient(135deg, rgba(0,32,91,.06), rgba(0,129,150,.06));
+  border:1px solid rgba(0,32,91,.12);border-radius:14px;padding:1.1rem 1.25rem;
+  display:flex;gap:14px;align-items:flex-start;margin-bottom:1.25rem;
+}
+.insight-card .spark{
+  width:38px;height:38px;border-radius:10px;flex-shrink:0;
+  background:linear-gradient(135deg,#00205B,#008196);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:16px;
+}
+.insight-card .txt{font-size:13px;}
+.insight-card .txt b{color:var(--navy);}
+.insight-card .tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--info);display:block;margin-bottom:3px;}
+
+/* ===== ENTRADA ESCALONADA ===== */
+.stagger > *{opacity:0;animation:slideUp .45s ease forwards;}
+.stagger > *:nth-child(1){animation-delay:.02s;}
+.stagger > *:nth-child(2){animation-delay:.08s;}
+.stagger > *:nth-child(3){animation-delay:.14s;}
+.stagger > *:nth-child(4){animation-delay:.2s;}
+.stagger > *:nth-child(5){animation-delay:.26s;}
+.stagger > *:nth-child(6){animation-delay:.32s;}
+.stagger > *:nth-child(7){animation-delay:.38s;}
+.stagger > *:nth-child(8){animation-delay:.44s;}
+
+/* ===== CENTRO DE NOTIFICACIONES =====
+   Vive en el topnav navy junto con el resto de iconos de accion, asi que
+   reusa la misma base circular/transparente que .topnav-icon-btn (antes
+   tenia fondo claro, pensado para el topbar de cada pagina). */
+.notif-wrap{position:relative;}
+.notif-bell{
+  position:relative;width:36px;height:36px;border-radius:50%;
+  border:none;background:transparent;color:#c9d3e8;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;
+  transition:background .15s ease, color .15s ease;font-family:inherit;
+}
+.notif-bell:hover{background:rgba(255,255,255,.14);color:#fff;}
+.notif-count{
+  position:absolute;top:-4px;right:-4px;background:var(--danger);color:#fff;
+  font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;padding:0 3px;
+}
+.notif-dropdown{
+  display:none;position:absolute;top:44px;right:0;width:320px;max-width:88vw;
+  background:var(--surface);border:1px solid var(--border-color);border-radius:12px;
+  box-shadow:0 20px 45px rgba(0,20,60,.18);z-index:60;overflow:hidden;animation:slideUp .2s ease;
+}
+.notif-dropdown.open{display:block;}
+.notif-header{padding:12px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);border-bottom:1px solid var(--border-color);}
+.notif-item{display:flex;gap:10px;align-items:flex-start;padding:11px 14px;font-size:12.5px;color:var(--text);border-bottom:1px solid var(--border-color);transition:background .12s ease;}
+.notif-item:last-child{border-bottom:none;}
+.notif-item:hover{background:var(--bg);}
+.notif-item i{margin-top:2px;flex-shrink:0;width:14px;text-align:center;}
+.notif-item.notif-danger i{color:var(--danger);}
+.notif-item.notif-warning i{color:var(--warning);}
+.notif-item.notif-success i{color:var(--success);}
+.notif-empty{padding:22px 14px;text-align:center;font-size:12.5px;color:var(--text-muted);line-height:1.8;}
+.notif-empty i{font-size:18px;color:var(--secondary);}
+
+/* ===== ASISTENTE CERTUS (chat flotante) ===== */
+.asistente-fab{
+  position:fixed;bottom:24px;right:24px;width:54px;height:54px;border-radius:50%;
+  background:linear-gradient(135deg,#00205B,#008196);color:#fff;border:none;
+  font-size:20px;cursor:pointer;box-shadow:0 10px 28px rgba(0,32,91,.35);z-index:70;
+  display:flex;align-items:center;justify-content:center;transition:transform .18s ease, box-shadow .18s ease;
+}
+.asistente-fab:hover{transform:translateY(-3px) scale(1.04);box-shadow:0 14px 34px rgba(0,32,91,.42);}
+.asistente-panel{
+  display:none;position:fixed;bottom:90px;right:24px;width:340px;max-width:90vw;height:440px;max-height:70vh;
+  background:var(--surface);border:1px solid var(--border-color);border-radius:16px;
+  box-shadow:0 25px 60px rgba(0,10,40,.3);z-index:70;overflow:hidden;flex-direction:column;animation:slideUp .25s ease;
+}
+.asistente-panel.open{display:flex;}
+.asistente-head{
+  background:linear-gradient(135deg,#00205B,#008196);color:#fff;padding:12px 14px;
+  display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700;flex-shrink:0;
+}
+.asistente-head i{margin-right:6px;color:#f0ad4e;}
+.asistente-head button{background:none;border:none;color:#fff;cursor:pointer;font-size:14px;opacity:.85;}
+.asistente-head button:hover{opacity:1;}
+.asistente-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--bg);}
+.asistente-bubble{max-width:82%;padding:9px 12px;border-radius:12px;font-size:12.5px;line-height:1.5;animation:toastIn .2s ease;}
+.asistente-bubble.bot{background:var(--surface);color:var(--text);border:1px solid var(--border-color);align-self:flex-start;border-bottom-left-radius:3px;}
+.asistente-bubble.usuario{background:var(--navy);color:#fff;align-self:flex-end;border-bottom-right-radius:3px;}
+.asistente-chips{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--border-color);flex-shrink:0;}
+.asistente-chips span{font-size:10.5px;background:var(--bg);border:1px solid var(--border-color);color:var(--text-muted);padding:4px 9px;border-radius:12px;cursor:pointer;transition:all .12s ease;}
+.asistente-chips span:hover{border-color:var(--navy);color:var(--navy);}
+.asistente-input{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--border-color);flex-shrink:0;}
+.asistente-input input{flex:1;border:1px solid var(--secondary);border-radius:20px;padding:8px 13px;font-size:12.5px;font-family:inherit;background:var(--surface);color:var(--text);}
+.asistente-input input:focus{outline:none;border-color:var(--navy);}
+.asistente-input button{width:34px;height:34px;border-radius:50%;background:var(--navy);color:#fff;border:none;cursor:pointer;flex-shrink:0;font-size:12px;}
+.asistente-input button:hover{background:var(--navy-dark);}
+
+/* ===== Mentorias: meta + Mis sesiones + resenas (MEJORA) ===== */
+.sesion-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border-color);flex-wrap:wrap;}
+.sesion-item:last-child{border-bottom:none;}
+.sesion-item .s-info{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--text);}
+.sesion-item .s-info b{font-size:13px;}
+.sesion-item .s-meta{font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;gap:5px;}
+.star-picker{display:flex;gap:6px;font-size:22px;color:var(--warning);margin:.5rem 0 1rem;}
+.star-picker i{cursor:pointer;transition:transform .1s ease;}
+.star-picker i:hover{transform:scale(1.15);}
+
+/* ===== Autoevaluacion: historial + huddle + tip de coaching (MEJORA) ===== */
+.autoeval-item{padding:.9rem 0;border-bottom:1px solid var(--border-color);}
+.autoeval-item:last-child{border-bottom:none;}
+.autoeval-item .ae-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:13px;color:var(--text);margin-bottom:.4rem;flex-wrap:wrap;}
+.autoeval-item .ae-head span{font-size:11.5px;color:var(--text-muted);font-weight:400;}
+.autoeval-item .ae-nota{font-size:12.5px;color:var(--text);background:var(--bg);border-radius:8px;padding:8px 10px;margin-bottom:.6rem;display:flex;gap:7px;align-items:flex-start;line-height:1.5;}
+.autoeval-item .ae-comentarios{margin-top:.4rem;}
+.tip-coaching{display:flex;gap:12px;align-items:flex-start;background:rgba(240,173,78,.12);border:1px solid rgba(240,173,78,.35);border-radius:10px;padding:12px 14px;}
+.tip-coaching i{color:var(--warning);font-size:18px;margin-top:2px;flex-shrink:0;}
+.tip-coaching p{font-size:12.5px;color:var(--text);margin-top:4px;line-height:1.5;}
+
+/* ===== Mi progreso: horas acumuladas + plan de desarrollo (IPDP) ===== */
+.horas-tag{display:inline-flex;align-items:center;gap:6px;background:rgba(0,129,150,.12);color:var(--info);border:1px solid rgba(0,129,150,.3);font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px;}
+.meta-item{display:flex;align-items:flex-start;gap:9px;font-size:13px;color:var(--text);padding:8px 0;border-bottom:1px solid var(--border-color);cursor:pointer;}
+.meta-item:last-child{border-bottom:none;}
+.meta-item input[type=checkbox]{width:16px;height:16px;accent-color:var(--success);margin-top:2px;flex-shrink:0;cursor:pointer;}
+.meta-cumplida{text-decoration:line-through;color:var(--text-muted);}
+.insignia.revision .icono{background:rgba(0,129,150,.15);color:var(--info);}
+.insignia.revision .nombre{color:var(--info);}
+
+/* ===== Perfil: docentes de tu area (MEJORA — PLC ligero) ===== */
+.area-docentes-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+.area-docente-card{display:flex;align-items:center;gap:10px;background:var(--bg);border-radius:10px;padding:10px 12px;cursor:pointer;transition:transform .15s ease, box-shadow .15s ease;}
+.area-docente-card:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(0,32,91,.1);}
+.area-docente-card .avatar{width:36px;height:36px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0;}
+.area-docente-card b{display:block;font-size:12.5px;color:var(--text);}
+.area-docente-card span{font-size:11px;color:var(--text-muted);}
+@media(max-width:760px){.area-docentes-grid{grid-template-columns:1fr;}}
+
+/* ===== Desactivar/reactivar docente (MEJORA) ===== */
+.tag-inactivo{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--danger);background:rgba(220,53,69,.12);border:1px solid rgba(220,53,69,.3);padding:2px 8px;border-radius:10px;margin-left:6px;vertical-align:middle;}
+
+/* ===== Ciclo de actualizacion profesional (MEJORA — MyGTCS) ===== */
+.ciclo-stepper{display:flex;align-items:center;gap:6px;margin-bottom:.9rem;}
+.ciclo-step{display:flex;align-items:center;gap:6px;flex:1;}
+.ciclo-step-circle{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;border:1.5px solid var(--border-color);color:var(--text-muted);}
+.ciclo-step-circle.done{background:var(--success);border-color:var(--success);color:#fff;}
+.ciclo-step span{font-size:11.5px;color:var(--text-muted);}
+.ciclo-step-circle.done ~ span{color:var(--text);}
+.ciclo-step-line{height:2px;flex:1;background:var(--border-color);}
+.ciclo-step-line.done{background:var(--success);}
+.ciclo-banner{border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:.9rem;display:flex;gap:8px;align-items:flex-start;line-height:1.5;}
+.ciclo-banner.pendiente{background:rgba(240,173,78,.14);color:#8a5a1a;}
+.ciclo-banner.confirmado{background:rgba(100,164,78,.14);color:#3a6b2a;}
+.ciclo-banner.neutro{background:var(--bg);color:var(--text-muted);}
+
+@media(max-width:480px){.asistente-panel{right:12px;bottom:82px;width:calc(100vw - 24px);} .asistente-fab{right:16px;bottom:16px;}}
+
+/* ===== PAGINACION (tablas largas) =====
+   CSS propio, sin Bootstrap: mismo patron visual que .btn-outline/.badge
+   para que quede consistente con el resto del sistema. */
+.pager{display:flex;list-style:none;justify-content:center;gap:4px;margin-top:1rem;flex-wrap:wrap;}
+.pager-link{
+  display:flex;align-items:center;justify-content:center;min-width:34px;height:34px;padding:0 10px;
+  border-radius:8px;border:1px solid var(--secondary);background:var(--surface);color:var(--text);
+  font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;
+  transition:background .15s ease, color .15s ease, border-color .15s ease;
+}
+.pager-link:hover{background:var(--bg);}
+.pager-item.active .pager-link{background:var(--navy);border-color:var(--navy);color:#fff;}
+.pager-item.disabled .pager-link{opacity:.4;pointer-events:none;cursor:default;}
