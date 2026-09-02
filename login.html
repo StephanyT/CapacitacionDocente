@@ -63,11 +63,7 @@
   });
 
   function ingresar(){
-    const msg = document.getElementById("msgError");
-    const rolTexto = rolSeleccionado === "docente" ? "Docente" : "Administrador";
-    msg.style.color = "#64a44e";
-    msg.textContent = `Entrarias al panel de ${rolTexto}. Asi seguira el flujo una vez conectemos los datos reales.`;
-    msg.style.display = "block";
+    window.location.href = rolSeleccionado === "docente" ? "docente/perfil.html" : "admin/dashboard.html";
   }
 </script>
 </body>
