@@ -80,11 +80,11 @@
   document.getElementById("pExperiencia").innerHTML = `<i class="fa-solid fa-briefcase"></i> ${docente.anios_experiencia} anos de experiencia`;
 
   // BLOQUE 2: avatar con iniciales, nombre completo y mini-resumen de
-  // insignias. El numero de insignias es de prueba (fijo) por ahora, porque
-  // INSIGNIAS todavia esta vacio en data.js -- cuando se cargue esa data real,
-  // esto se reemplaza por insigniasDeDocente(docente.id).
-  const insigniasGanadas = 3;
-  const insigniasTotal = 8;
+  // insignias. En 0 por ahora, porque INSIGNIAS todavia esta vacio en
+  // data.js -- cuando se cargue esa data real, esto se reemplaza por
+  // insigniasDeDocente(docente.id).
+  const insigniasGanadas = 0;
+  const insigniasTotal = 0;
   document.getElementById("avatar").textContent = docente.nombres[0] + docente.apellidos[0];
   document.getElementById("nombreCompleto").textContent = docente.nombres + " " + docente.apellidos;
   document.getElementById("miniInsignias").innerHTML = `${insigniasGanadas} de ${insigniasTotal} insignias · <a href="mi_progreso.html" style="color:var(--info);">Ver mi progreso</a>`;
