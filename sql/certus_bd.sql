@@ -7,6 +7,7 @@ CREATE TABLE docentes (
   nombres VARCHAR(100) NOT NULL,
   apellidos VARCHAR(100) NOT NULL,
   correo VARCHAR(150) NOT NULL UNIQUE,
+  password VARCHAR(255) NOT NULL,
   dni VARCHAR(20) NOT NULL UNIQUE,
   telefono VARCHAR(20),
   especialidad VARCHAR(100),

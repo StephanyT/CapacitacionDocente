@@ -51,6 +51,7 @@
     <div class="form-group"><label>Apellidos</label><input type="text" id="fApellidos"></div>
     <div class="form-group"><label>DNI</label><input type="text" id="fDni"></div>
     <div class="form-group"><label>Correo institucional</label><input type="email" id="fCorreo"></div>
+    <div class="form-group"><label>Contrasena</label><input type="password" id="fPassword" placeholder="Minimo 6 caracteres"></div>
     <div class="form-group"><label>Telefono</label><input type="text" id="fTelefono"></div>
     <div class="form-group"><label>Especialidad</label><input type="text" id="fEspecialidad" placeholder="Ej: Tecnologia educativa"></div>
     <div class="form-group"><label>Anos de experiencia</label><input type="number" id="fAniosExperiencia" min="0" max="50"></div>
@@ -335,7 +336,8 @@
   function abrirNuevo(){
     docenteEnEdicion = null;
     document.getElementById("tituloModal").textContent = "Nuevo docente";
-    ["fNombres","fApellidos","fDni","fCorreo","fTelefono","fEspecialidad","fAniosExperiencia","fBio"].forEach(id => document.getElementById(id).value = "");
+    ["fNombres","fApellidos","fDni","fCorreo","fPassword","fTelefono","fEspecialidad","fAniosExperiencia","fBio"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("fPassword").placeholder = "Minimo 6 caracteres";
     document.getElementById("errorDocente").style.display = "none";
     document.getElementById("modalDocente").classList.add("open");
   }
@@ -347,6 +349,8 @@
     document.getElementById("fApellidos").value = d.apellidos;
     document.getElementById("fDni").value = d.dni;
     document.getElementById("fCorreo").value = d.correo;
+    document.getElementById("fPassword").value = "";
+    document.getElementById("fPassword").placeholder = "Dejar en blanco para no cambiarla";
     document.getElementById("fTelefono").value = d.telefono;
     document.getElementById("fEspecialidad").value = d.especialidad || "";
     document.getElementById("fAniosExperiencia").value = d.anios_experiencia || "";
@@ -360,6 +364,7 @@
       apellidos: document.getElementById("fApellidos").value.trim(),
       dni: document.getElementById("fDni").value.trim(),
       correo: document.getElementById("fCorreo").value.trim(),
+      password: document.getElementById("fPassword").value,
       telefono: document.getElementById("fTelefono").value.trim(),
       especialidad: document.getElementById("fEspecialidad").value.trim(),
       anios_experiencia: parseInt(document.getElementById("fAniosExperiencia").value) || 0,
@@ -368,6 +373,11 @@
     const errorEl = document.getElementById("errorDocente");
     if(!datos.nombres || !datos.apellidos || !datos.dni || !datos.correo || !datos.especialidad){
       errorEl.textContent = "Completa nombres, apellidos, DNI, correo y especialidad antes de guardar.";
+      errorEl.style.display = "block";
+      return;
+    }
+    if(!docenteEnEdicion && datos.password.length < 6){
+      errorEl.textContent = "La contrasena debe tener al menos 6 caracteres.";
       errorEl.style.display = "block";
       return;
     }
