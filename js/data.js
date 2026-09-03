@@ -6,19 +6,7 @@
 // administradores, capacitaciones ni nada cargado todavia.
 // ============================================================
 
-const DOCENTES = [
-  {
-    id: 1,
-    nombres: "Maria",
-    apellidos: "Torres",
-    correo: "maria.torres@certus.edu.pe",
-    dni: "12345678",
-    telefono: "987654321",
-    especialidad: "Desarrollo de Software",
-    anios_experiencia: 5,
-    bio: "Docente del area de Desarrollo de Software, enfocada en programacion web y buenas practicas de codigo."
-  }
-];
+const DOCENTES = [];
 const ADMINISTRADORES = [];
 const CAPACITACIONES = [];
 const INSCRIPCIONES = [];

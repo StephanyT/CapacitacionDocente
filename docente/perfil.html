@@ -68,34 +68,33 @@
 <script src="../js/data.js"></script>
 <script src="../js/app.js"></script>
 <script>
-  // BLOQUE 1: por ahora usamos un docente fijo de prueba (id 1) en vez de
-  // requireSesion("docente"), porque login.html todavia no guarda la sesion
-  // real (eso lo conecta tu companero). Cuando lo haga, esta linea cambia a:
+  // Todos los bloques leen de "docente", pero DOCENTES esta vacio en
+  // data.js todavia (sin datos reales), asi que usamos un objeto vacio de
+  // respaldo para que no truene mientras no hay data. Cuando login.html
+  // guarde la sesion real y DOCENTES tenga datos, esta linea cambia a:
   //   const sesion = requireSesion("docente");
   //   const docente = DOCENTES.find(d => d.id === sesion.id);
-  const docente = DOCENTES.find(d => d.id === 1);
+  const docente = DOCENTES.find(d => d.id === 1) || { nombres: "", apellidos: "", especialidad: "", anios_experiencia: 0 };
 
+  // BLOQUE 1: topbar + hero. Vacio/0 hasta que haya un docente real.
   document.getElementById("nombreTopbar").textContent = docente.nombres;
   document.getElementById("pEspecialidad").innerHTML = `<i class="fa-solid fa-bullseye"></i> ${docente.especialidad}`;
   document.getElementById("pExperiencia").innerHTML = `<i class="fa-solid fa-briefcase"></i> ${docente.anios_experiencia} anos de experiencia`;
 
-  // BLOQUE 2: avatar con iniciales, nombre completo y mini-resumen de
-  // insignias. El numero de insignias es de prueba (fijo) por ahora, porque
-  // INSIGNIAS todavia esta vacio en data.js -- cuando se cargue esa data real,
-  // esto se reemplaza por insigniasDeDocente(docente.id).
-  const insigniasGanadas = 3;
-  const insigniasTotal = 8;
-  document.getElementById("avatar").textContent = docente.nombres[0] + docente.apellidos[0];
-  document.getElementById("nombreCompleto").textContent = docente.nombres + " " + docente.apellidos;
+  // BLOQUE 2: avatar, nombre y mini-resumen de insignias. En 0 hasta que
+  // INSIGNIAS tenga datos -- luego se reemplaza por insigniasDeDocente(docente.id).
+  const insigniasGanadas = 0;
+  const insigniasTotal = 0;
+  document.getElementById("avatar").textContent = docente.nombres.charAt(0) + docente.apellidos.charAt(0);
+  document.getElementById("nombreCompleto").textContent = `${docente.nombres} ${docente.apellidos}`.trim();
   document.getElementById("miniInsignias").innerHTML = `${insigniasGanadas} de ${insigniasTotal} insignias · <a href="mi_progreso.html" style="color:var(--info);">Ver mi progreso</a>`;
 
-  // BLOQUE 3: stats de capacitaciones. Tambien numeros de prueba por ahora,
-  // porque INSCRIPCIONES esta vacio en data.js -- cuando se cargue esa data
-  // real, esto se calcula filtrando INSCRIPCIONES por id_docente y estado.
-  animateCount(document.getElementById("statAsignadas"), 10);
-  animateCount(document.getElementById("statCompletadas"), 6);
-  animateCount(document.getElementById("statEnCurso"), 2);
-  animateCount(document.getElementById("statPendientes"), 2);
+  // BLOQUE 3: stats de capacitaciones. En 0 hasta que INSCRIPCIONES tenga
+  // datos -- luego se calcula filtrando por id_docente y estado.
+  animateCount(document.getElementById("statAsignadas"), 0);
+  animateCount(document.getElementById("statCompletadas"), 0);
+  animateCount(document.getElementById("statEnCurso"), 0);
+  animateCount(document.getElementById("statPendientes"), 0);
 </script>
 </body>
 </html>
