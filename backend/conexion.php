@@ -4,7 +4,7 @@
 $host = "localhost";
 $usuario = "root";
 $clave = "";
-$basedatos = "certus_bd";
+$basedatos = "certus_db";
 
 $conexion = new mysqli($host, $usuario, $clave, $basedatos);
 
