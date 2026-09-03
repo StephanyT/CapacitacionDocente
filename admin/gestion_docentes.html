@@ -24,18 +24,383 @@
       <a href="reportes.html">Reportes</a>
       <a href="mentores.html">Mentores</a>
     </div>
-    <div class="topnav-right" id="topnavRight">
-      <button class="notif-bell" type="button" aria-label="Notificaciones" title="Notificaciones"><i class="fa-solid fa-bell"></i></button>
-      <button class="topnav-icon-btn" type="button" aria-label="Centro de soporte" title="Centro de soporte"><i class="fa-solid fa-headset"></i></button>
-      <div class="topnav-avatar-wrap">
-        <a href="../login.html" class="topnav-avatar" aria-label="Volver al login" title="Volver al login"><i class="fa-solid fa-user"></i></a>
-      </div>
-    </div>
+    <div class="topnav-right" id="topnavRight"></div>
   </nav>
 
   <main class="main">
-    <!-- Contenido de la pagina: se construye despues. Por ahora solo el navbar. -->
+    <div class="topbar">
+      <h1>Gestion de docentes</h1>
+      <button class="btn btn-primary" onclick="abrirNuevo()"><i class="fa-solid fa-user-plus"></i> Nuevo docente</button>
+    </div>
+
+    <p style="font-size:12.5px;color:var(--text-muted);margin:-.75rem 0 1rem;"><i class="fa-solid fa-circle-info"></i> Haz clic en un docente para ver su perfil completo.</p>
+    <table>
+      <thead><tr><th>Nombre</th><th>DNI</th><th>Correo</th><th>Telefono</th><th></th></tr></thead>
+      <tbody id="tablaDocentes"></tbody>
+    </table>
+    <nav aria-label="Paginacion de docentes" style="margin-top:1rem;">
+      <ul class="pager" id="paginacionDocentes"></ul>
+    </nav>
   </main>
 </div>
+
+<div class="modal-overlay" id="modalDocente">
+  <div class="modal-box" style="width:400px;text-align:left;">
+    <h3 id="tituloModal">Nuevo docente</h3>
+    <div class="form-group"><label>Nombres</label><input type="text" id="fNombres"></div>
+    <div class="form-group"><label>Apellidos</label><input type="text" id="fApellidos"></div>
+    <div class="form-group"><label>DNI</label><input type="text" id="fDni"></div>
+    <div class="form-group"><label>Correo institucional</label><input type="email" id="fCorreo"></div>
+    <div class="form-group"><label>Telefono</label><input type="text" id="fTelefono"></div>
+    <div class="form-group"><label>Especialidad</label><input type="text" id="fEspecialidad" placeholder="Ej: Tecnologia educativa"></div>
+    <div class="form-group"><label>Anos de experiencia</label><input type="number" id="fAniosExperiencia" min="0" max="50"></div>
+    <div class="form-group"><label>Bio</label><textarea id="fBio" rows="2" style="width:100%;padding:9px 11px;border:1px solid var(--secondary);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;background:var(--surface);color:var(--text);"></textarea></div>
+    <p id="errorDocente" style="font-size:12px;color:var(--danger);margin-bottom:.5rem;display:none;"></p>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="cerrarModal()"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarDocente()"><i class="fa-solid fa-check"></i> Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalPerfilDocente">
+  <div class="modal-box wide" id="modalPerfilDocenteBox"></div>
+</div>
+
+<div class="modal-overlay" id="modalDesactivar">
+  <div class="modal-box" style="width:380px;text-align:left;">
+    <h3><i class="fa-solid fa-user-slash"></i> Desactivar docente</h3>
+    <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:1rem;">Vas a desactivar a <b id="nombreDesactivar" style="color:var(--text);"></b>. Su historial de capacitaciones, insignias y constancias no se elimina — se conserva como registro profesional, igual que en los sistemas reales de desarrollo docente. Puedes reactivarlo cuando quieras.</p>
+    <div class="form-group">
+      <label>Motivo de la baja</label>
+      <select id="fMotivoBaja" style="width:100%;padding:9px 11px;border:1px solid var(--secondary);border-radius:8px;font-size:13px;font-family:inherit;background:var(--surface);color:var(--text);">
+        <option value="">Selecciona un motivo...</option>
+        <option value="Cese">Cese</option>
+        <option value="Renuncia">Renuncia</option>
+        <option value="Licencia">Licencia (ausencia temporal)</option>
+        <option value="Jubilacion">Jubilacion</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:.5rem;">
+      <button class="btn btn-outline" onclick="cerrarDesactivar()"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+      <button class="btn btn-danger" onclick="confirmarDesactivar()"><i class="fa-solid fa-user-slash"></i> Desactivar</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/data.js"></script>
+<script src="../js/app.js"></script>
+<script>
+  requireSesion("admin");
+
+  function iniciales(nombres, apellidos){ return (nombres[0] + apellidos[0]).toUpperCase(); }
+
+  // Paginacion — antes se mostraban todos los docentes en una sola tabla
+  // larga; con la lista creciendo en vivo durante la demo, se vuelve mas
+  // facil de navegar en paginas de 5.
+  const DOCENTES_POR_PAGINA = 5;
+  let paginaActualDocentes = 1;
+
+  function cambiarPaginaDocentes(pagina){
+    paginaActualDocentes = pagina;
+    render();
+    window.scrollTo({top: 0, behavior: "smooth"});
+  }
+
+  function renderPaginacionDocentes(totalPaginas){
+    const cont = document.getElementById("paginacionDocentes");
+    if(!cont) return;
+    if(totalPaginas <= 1){ cont.innerHTML = ""; return; }
+    let html = `<li class="pager-item ${paginaActualDocentes === 1 ? "disabled" : ""}">
+      <a class="pager-link" href="#" onclick="event.preventDefault();cambiarPaginaDocentes(${paginaActualDocentes - 1})">Anterior</a>
+    </li>`;
+    for(let p = 1; p <= totalPaginas; p++){
+      html += `<li class="pager-item ${p === paginaActualDocentes ? "active" : ""}">
+        <a class="pager-link" href="#" onclick="event.preventDefault();cambiarPaginaDocentes(${p})">${p}</a>
+      </li>`;
+    }
+    html += `<li class="pager-item ${paginaActualDocentes === totalPaginas ? "disabled" : ""}">
+      <a class="pager-link" href="#" onclick="event.preventDefault();cambiarPaginaDocentes(${paginaActualDocentes + 1})">Siguiente</a>
+    </li>`;
+    cont.innerHTML = html;
+  }
+
+  function render(){
+    const totalPaginas = Math.max(1, Math.ceil(DOCENTES.length / DOCENTES_POR_PAGINA));
+    if(paginaActualDocentes > totalPaginas) paginaActualDocentes = totalPaginas;
+    const inicio = (paginaActualDocentes - 1) * DOCENTES_POR_PAGINA;
+    const paginaDocentes = DOCENTES.slice(inicio, inicio + DOCENTES_POR_PAGINA);
+
+    document.getElementById("tablaDocentes").innerHTML = paginaDocentes.length ? paginaDocentes.map(d => {
+      const inactivo = estadoDocente(d.id);
+      return `
+      <tr style="cursor:pointer;" onclick="abrirPerfilDocente(${d.id})">
+        <td>${d.nombres} ${d.apellidos} ${inactivo ? `<span class="tag-inactivo">Inactivo</span>` : ""}</td>
+        <td>${d.dni}</td>
+        <td>${d.correo}</td>
+        <td>${d.telefono}</td>
+        <td style="display:flex;gap:6px;">
+          <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();abrirEditar(${d.id})"><i class="fa-solid fa-pen"></i> Editar</button>
+          ${inactivo
+            ? `<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();reactivarDocente(${d.id})"><i class="fa-solid fa-rotate-left"></i> Reactivar</button>`
+            : `<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();abrirDesactivar(${d.id})"><i class="fa-solid fa-user-slash"></i> Desactivar</button>`}
+        </td>
+      </tr>
+    `;
+    }).join("") : `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Aun no hay docentes registrados. Usa "Nuevo docente" para agregar el primero.</td></tr>`;
+
+    renderPaginacionDocentes(totalPaginas);
+  }
+  render();
+
+  let docenteADesactivar = null;
+  function abrirDesactivar(id){
+    docenteADesactivar = id;
+    const d = DOCENTES.find(x => x.id === id);
+    document.getElementById("nombreDesactivar").textContent = `${d.nombres} ${d.apellidos}`;
+    document.getElementById("fMotivoBaja").value = "";
+    document.getElementById("modalDesactivar").classList.add("open");
+  }
+  function cerrarDesactivar(){
+    document.getElementById("modalDesactivar").classList.remove("open");
+  }
+  function confirmarDesactivar(){
+    const motivo = document.getElementById("fMotivoBaja").value;
+    if(!motivo){ showToast("Elige un motivo antes de continuar", "error"); return; }
+    desactivarDocenteLocal(docenteADesactivar, motivo);
+    cerrarDesactivar();
+    render();
+    showToast("Docente desactivado. Su historial de PD sigue disponible en su perfil.", "info");
+  }
+  function reactivarDocente(id){
+    reactivarDocenteLocal(id);
+    render();
+    showToast("Docente reactivado", "success");
+  }
+
+  function abrirPerfilDocente(id){
+    const d = DOCENTES.find(x => x.id === id);
+    const insignias = insigniasDeDocente(id);
+    const ganadas = insignias.filter(i => i.ganada).length;
+    const misInscripciones = INSCRIPCIONES.filter(i => i.id_docente === id);
+    const completadas = misInscripciones.filter(i => i.estado === "completada");
+    const enCurso = misInscripciones.filter(i => i.estado === "en curso");
+    const misConstancias = CONSTANCIAS.filter(c => completadas.some(i => i.id === c.id_inscripcion));
+    const historial = [...misInscripciones].sort((a,b) => new Date(b.fecha_actualizacion || b.fecha_inscripcion) - new Date(a.fecha_actualizacion || a.fecha_inscripcion)).slice(0,5);
+    const plan = planDeDocente(id);
+    const evidenciasPendientes = evidenciasDeDocente(id).filter(e => e.estado === "pendiente");
+    const inactivo = estadoDocente(id);
+
+    // Ciclo de actualizacion profesional (MEJORA — MyGTCS): el admin
+    // confirma el cierre del periodo cuando el docente lo solicita.
+    const ciclo = estadoCiclo(id, plan.periodo);
+    let cicloHTML = "";
+    if(ciclo && ciclo.estado === "confirmado"){
+      cicloHTML = `<div class="ciclo-banner confirmado" style="margin-top:.75rem;"><i class="fa-solid fa-circle-check"></i> Ciclo confirmado por ${ciclo.confirmado_por} el ${ciclo.fecha_confirmacion}.</div>`;
+    } else if(ciclo && ciclo.estado === "solicitado"){
+      cicloHTML = `
+        <div class="ciclo-banner pendiente" style="margin-top:.75rem;">
+          <i class="fa-solid fa-hourglass-half"></i> Solicito la confirmacion del ciclo ${plan.periodo} el ${ciclo.fecha_solicitud}.
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="confirmarCiclo(${id}, '${plan.periodo}')"><i class="fa-solid fa-check"></i> Confirmar ciclo</button>
+      `;
+    }
+
+    document.getElementById("modalPerfilDocenteBox").innerHTML = `
+      <div class="mentor-modal-head">
+        <div class="avatar-lg">${iniciales(d.nombres, d.apellidos)}</div>
+        <div>
+          <h3>${d.nombres} ${d.apellidos} ${inactivo ? `<span class="tag-inactivo">Inactivo</span>` : ""}</h3>
+          <span><i class="fa-solid fa-bullseye"></i> ${d.especialidad} · ${d.anios_experiencia} anos de experiencia</span>
+        </div>
+      </div>
+      ${inactivo ? `
+        <div class="mentor-modal-section" style="background:var(--bg);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--text-muted);">
+          <i class="fa-solid fa-circle-info"></i> Desactivado por <b style="color:var(--text);">${inactivo.motivo}</b> el ${inactivo.fecha}. Su historial de PD abajo se conserva completo — no se elimina al desactivar a un docente.
+        </div>
+      ` : ""}
+      ${d.editado_por ? `
+        <p style="font-size:11px;color:var(--text-muted);margin-bottom:.75rem;"><i class="fa-solid fa-clock-rotate-left"></i> Ultima edicion: ${d.editado_por}, ${d.fecha_edicion}</p>
+      ` : ""}
+      <div class="mentor-stats-row">
+        <div><b>${misInscripciones.length}</b><span>Asignadas</span></div>
+        <div><b>${completadas.length}</b><span>Completadas</span></div>
+        <div><b>${enCurso.length}</b><span>En curso</span></div>
+        <div><b>${ganadas}</b><span>Insignias</span></div>
+        <div><b>${misConstancias.length}</b><span>Constancias</span></div>
+        <div><b>${horasAcumuladas(id)}/${META_HORAS_PERIODO}</b><span>Horas de PD (periodo)</span></div>
+      </div>
+      <p class="mentor-bio">${d.bio}</p>
+      <table class="table-kv" style="margin-bottom:1.1rem;">
+        <tr><td style="color:var(--text-muted);width:110px;">Correo</td><td>${d.correo}</td></tr>
+        <tr><td style="color:var(--text-muted);">DNI</td><td>${d.dni}</td></tr>
+        <tr><td style="color:var(--text-muted);">Telefono</td><td>${d.telefono}</td></tr>
+      </table>
+
+      <div class="mentor-modal-section">
+        <h4><i class="fa-solid fa-award"></i> Insignias</h4>
+        <div class="insignias-grid" style="margin-bottom:1.1rem;">
+          ${insignias.map(ins => `
+            <div class="insignia ${ins.ganada ? "ganada" : "bloqueada"}" title="${ins.requisito || ""}">
+              <div class="icono"><i class="fa-solid ${ins.ganada ? iconoInsignia(ins.icono) : "fa-lock"}"></i></div>
+              <div class="nombre">${ins.nombre}</div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+
+      <div class="mentor-modal-section">
+        <h4><i class="fa-solid fa-bullseye"></i> Plan de desarrollo (${plan.periodo})</h4>
+        <div class="timeline">
+          ${plan.metas.length ? plan.metas.map(m => `
+            <div class="timeline-item ${m.estado === "cumplida" ? "" : "pend"}">
+              <b>${m.texto}</b>
+              <span>${m.estado === "cumplida" ? "Cumplida" : "En progreso"}</span>
+            </div>
+          `).join("") : `<p style="font-size:12.5px;color:var(--text-muted);">Aun no definio metas para este periodo.</p>`}
+        </div>
+        ${cicloHTML}
+      </div>
+
+      ${evidenciasPendientes.length ? `
+        <div class="mentor-modal-section">
+          <h4><i class="fa-solid fa-file-circle-check"></i> Evidencias de insignias por revisar</h4>
+          ${evidenciasPendientes.map(e => {
+            const ins = INSIGNIAS.find(x => x.id === e.id_insignia);
+            return `
+              <div class="review-item">
+                <div class="r-head"><span>${ins ? ins.nombre : "Insignia"}</span><span style="font-size:11px;color:var(--text-muted);">${e.fecha}</span></div>
+                <p>${e.texto}</p>
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                  <button class="btn btn-outline btn-sm" onclick="revisarEvidencia(${id}, ${e.id}, 'rechazada')"><i class="fa-solid fa-xmark"></i> Rechazar</button>
+                  <button class="btn btn-primary btn-sm" onclick="revisarEvidencia(${id}, ${e.id}, 'aprobada')"><i class="fa-solid fa-check"></i> Aprobar</button>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      ` : ""}
+
+      <div class="mentor-modal-section">
+        <h4><i class="fa-solid fa-clock-rotate-left"></i> Historial reciente</h4>
+        <div class="timeline">
+          ${historial.map(i => {
+            const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
+            return `<div class="timeline-item ${i.estado === "completada" ? "" : "pend"}">
+              <b>${cap.titulo}</b>
+              <span>${badgeTexto(i.estado)} · ${i.fecha_actualizacion || i.fecha_inscripcion}</span>
+            </div>`;
+          }).join("") || `<p style="font-size:12.5px;color:var(--text-muted);">Aun no tiene historial.</p>`}
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:1.25rem;">
+        <button class="btn btn-outline btn-sm" onclick="cerrarPerfilDocente()">Cerrar</button>
+        <button class="btn btn-primary btn-sm" onclick="cerrarPerfilDocente();abrirEditar(${d.id});"><i class="fa-solid fa-pen"></i> Editar datos</button>
+      </div>
+    `;
+    document.getElementById("modalPerfilDocente").classList.add("open");
+  }
+  function revisarEvidencia(idDocente, idEvidencia, nuevoEstado){
+    actualizarEstadoEvidenciaLocal(idDocente, idEvidencia, nuevoEstado);
+    showToast(nuevoEstado === "aprobada" ? "Evidencia aprobada — insignia otorgada" : "Evidencia rechazada", nuevoEstado === "aprobada" ? "success" : "info");
+    abrirPerfilDocente(idDocente);
+  }
+  function confirmarCiclo(idDocente, periodo){
+    const sesion = getSesionActiva();
+    confirmarCicloLocal(idDocente, periodo, sesion.nombre);
+    showToast("Ciclo confirmado", "success");
+    abrirPerfilDocente(idDocente);
+  }
+  function cerrarPerfilDocente(){
+    document.getElementById("modalPerfilDocente").classList.remove("open");
+  }
+
+  let docenteEnEdicion = null;
+  function abrirNuevo(){
+    docenteEnEdicion = null;
+    document.getElementById("tituloModal").textContent = "Nuevo docente";
+    ["fNombres","fApellidos","fDni","fCorreo","fTelefono","fEspecialidad","fAniosExperiencia","fBio"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("errorDocente").style.display = "none";
+    document.getElementById("modalDocente").classList.add("open");
+  }
+  function abrirEditar(id){
+    const d = DOCENTES.find(x => x.id === id);
+    docenteEnEdicion = id;
+    document.getElementById("tituloModal").textContent = "Editar docente";
+    document.getElementById("fNombres").value = d.nombres;
+    document.getElementById("fApellidos").value = d.apellidos;
+    document.getElementById("fDni").value = d.dni;
+    document.getElementById("fCorreo").value = d.correo;
+    document.getElementById("fTelefono").value = d.telefono;
+    document.getElementById("fEspecialidad").value = d.especialidad || "";
+    document.getElementById("fAniosExperiencia").value = d.anios_experiencia || "";
+    document.getElementById("fBio").value = d.bio || "";
+    document.getElementById("errorDocente").style.display = "none";
+    document.getElementById("modalDocente").classList.add("open");
+  }
+  function guardarDocente(){
+    const datos = {
+      nombres: document.getElementById("fNombres").value.trim(),
+      apellidos: document.getElementById("fApellidos").value.trim(),
+      dni: document.getElementById("fDni").value.trim(),
+      correo: document.getElementById("fCorreo").value.trim(),
+      telefono: document.getElementById("fTelefono").value.trim(),
+      especialidad: document.getElementById("fEspecialidad").value.trim(),
+      anios_experiencia: parseInt(document.getElementById("fAniosExperiencia").value) || 0,
+      bio: document.getElementById("fBio").value.trim()
+    };
+    const errorEl = document.getElementById("errorDocente");
+    if(!datos.nombres || !datos.apellidos || !datos.dni || !datos.correo || !datos.especialidad){
+      errorEl.textContent = "Completa nombres, apellidos, DNI, correo y especialidad antes de guardar.";
+      errorEl.style.display = "block";
+      return;
+    }
+    // Mismo dominio institucional que exige login.html (RF-05): sin esto se
+    // podia crear un docente cuya cuenta nunca iba a poder iniciar sesion.
+    if(!datos.correo.toLowerCase().endsWith("@certus.edu.pe")){
+      errorEl.textContent = "El correo debe terminar en @certus.edu.pe — si no, el docente no podra iniciar sesion.";
+      errorEl.style.display = "block";
+      return;
+    }
+    const correoDuplicado = DOCENTES.some(d => d.id !== docenteEnEdicion && d.correo.toLowerCase() === datos.correo.toLowerCase());
+    if(correoDuplicado){
+      errorEl.textContent = "Ya existe un docente registrado con ese correo.";
+      errorEl.style.display = "block";
+      return;
+    }
+    const dniDuplicado = DOCENTES.some(d => d.id !== docenteEnEdicion && d.dni === datos.dni);
+    if(dniDuplicado){
+      errorEl.textContent = "Ya existe un docente registrado con ese DNI.";
+      errorEl.style.display = "block";
+      return;
+    }
+    errorEl.style.display = "none";
+
+    if(docenteEnEdicion){
+      guardarDocenteOverride(docenteEnEdicion, datos);
+      const d = DOCENTES.find(x => x.id === docenteEnEdicion);
+      Object.assign(d, datos, {editado_por: (getSesionActiva()||{}).nombre || "Admin", fecha_edicion: new Date().toISOString().slice(0,10)});
+    } else {
+      const nuevo = crearDocenteLocal(datos);
+      DOCENTES.push(nuevo);
+    }
+    cerrarModal();
+    render();
+    showToast("Docente guardado correctamente", "success");
+  }
+  function cerrarModal(){
+    document.getElementById("modalDocente").classList.remove("open");
+  }
+
+  // Deep link desde el Dashboard ("Requiere tu atencion"): si llega
+  // ?docente=ID, abre directo el perfil de ese docente en vez de obligar
+  // al admin a buscarlo en la tabla.
+  const parametrosURL = new URLSearchParams(window.location.search);
+  const docenteDesdeURL = parametrosURL.get("docente");
+  if(docenteDesdeURL && DOCENTES.some(d => d.id === parseInt(docenteDesdeURL))){
+    abrirPerfilDocente(parseInt(docenteDesdeURL));
+  }
+</script>
 </body>
 </html>

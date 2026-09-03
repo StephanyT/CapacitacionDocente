@@ -24,18 +24,171 @@
       <a href="reportes.html">Reportes</a>
       <a href="mentores.html">Mentores</a>
     </div>
-    <div class="topnav-right" id="topnavRight">
-      <button class="notif-bell" type="button" aria-label="Notificaciones" title="Notificaciones"><i class="fa-solid fa-bell"></i></button>
-      <button class="topnav-icon-btn" type="button" aria-label="Centro de soporte" title="Centro de soporte"><i class="fa-solid fa-headset"></i></button>
-      <div class="topnav-avatar-wrap">
-        <a href="../login.html" class="topnav-avatar" aria-label="Volver al login" title="Volver al login"><i class="fa-solid fa-user"></i></a>
-      </div>
-    </div>
+    <div class="topnav-right" id="topnavRight"></div>
   </nav>
 
   <main class="main">
-    <!-- Contenido de la pagina: se construye despues. Por ahora solo el navbar. -->
+    <div class="topbar">
+      <h1>Panel administrador</h1>
+    </div>
+
+    <div class="insight-card" id="insightCard"></div>
+
+    <div class="card" id="cardAccionesPendientes"></div>
+
+    <div class="grid-4 stagger" id="metricas"></div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h2><i class="fa-solid fa-chart-column"></i> Estado de las capacitaciones</h2>
+        <canvas id="chartEstados" height="160"></canvas>
+      </div>
+      <div class="card">
+        <h2><i class="fa-solid fa-traffic-light"></i> Semaforo de cumplimiento</h2>
+        <table>
+          <thead><tr><th></th><th>Docente</th><th>Capacitacion</th><th>Estado</th></tr></thead>
+          <tbody id="tablaSemaforo"></tbody>
+        </table>
+      </div>
+    </div>
   </main>
 </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="../js/data.js"></script>
+<script src="../js/app.js"></script>
+<script>
+  const sesion = requireSesion("admin");
+
+  const totalDocentes = DOCENTES.length;
+  const totalCapacitaciones = CAPACITACIONES.length;
+  const completadas = INSCRIPCIONES.filter(i => i.estado === "completada").length;
+  const enCurso = INSCRIPCIONES.filter(i => i.estado === "en curso").length;
+  const pendientes = INSCRIPCIONES.filter(i => i.estado === "pendiente").length;
+  // Bug real encontrado al vaciar los datos para la demo: con 0 inscripciones
+  // esto daba NaN% (division entre cero) en vez de 0%.
+  const avance = INSCRIPCIONES.length ? Math.round(completadas / INSCRIPCIONES.length * 100) : 0;
+
+  document.getElementById("metricas").innerHTML = `
+    <div class="card metric"><div class="icon-wrap"><i class="fa-solid fa-users"></i></div><div class="num" id="numDocentes">0</div><div class="label">Docentes</div></div>
+    <div class="card metric"><div class="icon-wrap"><i class="fa-solid fa-chalkboard-user"></i></div><div class="num" id="numCapacitaciones">0</div><div class="label">Capacitaciones activas</div></div>
+    <div class="card metric"><div class="icon-wrap"><i class="fa-solid fa-chart-pie"></i></div><div class="num" id="numAvance">0%</div><div class="label">Avance global</div></div>
+    <div class="card metric"><div class="icon-wrap"><i class="fa-solid fa-people-group"></i></div><div class="num" id="numMentores">0</div><div class="label">Mentores activos</div></div>
+  `;
+  // Resumen inteligente: prioriza en vez de solo mostrar datos, con reglas
+  // simples (semaforo por fecha_limite). Se aclara explicitamente que no es
+  // un modelo de IA, igual que el Asistente CERTUS.
+  const vencidos = INSCRIPCIONES.filter(i => semaforoClase(i) === "semaforo-rojo");
+  const porVencer = INSCRIPCIONES.filter(i => semaforoClase(i) === "semaforo-ambar");
+  let insightMsg, insightTag;
+  if(vencidos.length > 0){
+    const nombres = [...new Set(vencidos.map(i => nombreDocente(i.id_docente)))].join(", ");
+    insightTag = "Requiere atencion";
+    insightMsg = `<b>${vencidos.length} capacitacion(es) vencida(s)</b> sin completar — ${nombres}. Te sugerimos contactarlos hoy.`;
+  } else if(porVencer.length > 0){
+    const nombres = [...new Set(porVencer.map(i => nombreDocente(i.id_docente)))].join(", ");
+    insightTag = "Por vencer pronto";
+    insightMsg = `<b>${porVencer.length} capacitacion(es)</b> estan por vencer — ${nombres}. Aun estan a tiempo.`;
+  } else {
+    insightTag = "Todo al dia";
+    insightMsg = `Todos los docentes estan <b>al dia</b> con sus capacitaciones asignadas. Buen ritmo de cumplimiento.`;
+  }
+  const iconoNoIA = `<i class="fa-solid fa-circle-info" title="Calculado con reglas sobre los datos del sistema, no es un modelo de IA."></i>`;
+  document.getElementById("insightCard").innerHTML = `
+    <div class="spark"><i class="fa-solid fa-sparkles"></i></div>
+    <div class="txt"><span class="tag">${insightTag} · Resumen inteligente ${iconoNoIA}</span>${insightMsg}</div>
+  `;
+
+  // ===== Requiere tu atencion: cola consolidada de acciones pendientes =====
+  // Antes de esto, un admin tenia que entrar a "Gestion de capacitaciones"
+  // (solicitudes y sugerencias) Y abrir uno por uno cada perfil de docente
+  // en "Gestion de docentes" (evidencias) para enterarse de que habia algo
+  // pendiente de revisar. Las 3 funciones ya existian en app.js, pero
+  // todasLasEvidenciasPendientes() nunca se llamaba desde ninguna pagina.
+  // Patron: bandeja de aprobaciones al frente del dashboard, como en
+  // Frontline Central / MyLearningPlan (EE.UU.).
+  const solicitudesPend = todasLasSolicitudesPendientes();
+  const sugerenciasPend = todasLasSugerencias().filter(s => s.estado !== "atendida");
+  const evidenciasPend = todasLasEvidenciasPendientes();
+  const totalPendiente = solicitudesPend.length + sugerenciasPend.length + evidenciasPend.length;
+
+  const cardAcciones = document.getElementById("cardAccionesPendientes");
+  if(totalPendiente === 0){
+    cardAcciones.innerHTML = `
+      <h2><i class="fa-solid fa-clipboard-check"></i> Requiere tu atencion</h2>
+      <p style="font-size:12.5px;color:var(--text-muted);"><i class="fa-solid fa-circle-check" style="color:var(--success);"></i> No tienes solicitudes, sugerencias ni evidencias pendientes de revisar.</p>
+    `;
+  } else {
+    const filas = [];
+    if(solicitudesPend.length){
+      filas.push(`
+        <a class="review-item" href="gestion_capacitaciones.html" style="display:block;text-decoration:none;color:inherit;">
+          <div class="r-head"><span><i class="fa-solid fa-inbox"></i> Solicitudes de acceso a capacitaciones</span><span class="badge badge-pendiente">${solicitudesPend.length}</span></div>
+          <p>${[...new Set(solicitudesPend.map(s => nombreDocente(s.id_docente)))].join(", ")}</p>
+        </a>
+      `);
+    }
+    if(sugerenciasPend.length){
+      filas.push(`
+        <a class="review-item" href="gestion_capacitaciones.html" style="display:block;text-decoration:none;color:inherit;">
+          <div class="r-head"><span><i class="fa-solid fa-lightbulb"></i> Sugerencias de tema de capacitacion</span><span class="badge badge-pendiente">${sugerenciasPend.length}</span></div>
+          <p>${[...new Set(sugerenciasPend.map(s => nombreDocente(s.id_docente)))].join(", ")}</p>
+        </a>
+      `);
+    }
+    if(evidenciasPend.length){
+      filas.push(`
+        <div class="review-item">
+          <div class="r-head"><span><i class="fa-solid fa-file-circle-check"></i> Evidencias de insignias por revisar</span><span class="badge badge-pendiente">${evidenciasPend.length}</span></div>
+          <p>
+            ${evidenciasPend.map(e => `<a href="gestion_docentes.html?docente=${e.id_docente}" style="color:var(--info);">${nombreDocente(e.id_docente)}</a>`).join(", ")}
+          </p>
+        </div>
+      `);
+    }
+    cardAcciones.innerHTML = `<h2><i class="fa-solid fa-clipboard-check"></i> Requiere tu atencion</h2>${filas.join("")}`;
+  }
+
+  animateCount(document.getElementById("numDocentes"), totalDocentes);
+  animateCount(document.getElementById("numCapacitaciones"), totalCapacitaciones);
+  animateCount(document.getElementById("numAvance"), avance, "%");
+  animateCount(document.getElementById("numMentores"), MENTORES.length);
+
+  new Chart(document.getElementById("chartEstados"), {
+    type: "bar",
+    data: {
+      labels: ["Pendiente", "En curso", "Completada"],
+      datasets: [{
+        data: [pendientes, enCurso, completadas],
+        backgroundColor: ["#f0ad4e", "#008196", "#64a44e"],
+        borderRadius: 6,
+        maxBarThickness: 46
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+    }
+  });
+
+  // Ordenado por urgencia (rojo primero, luego ambar, luego verde) en vez del
+  // orden de insercion: con 28 inscripciones, un admin no deberia tener que
+  // escanear toda la tabla para encontrar lo vencido.
+  const ordenUrgencia = {"semaforo-rojo": 0, "semaforo-ambar": 1, "semaforo-verde": 2};
+  const inscripcionesOrdenadas = [...INSCRIPCIONES].sort((a, b) => ordenUrgencia[semaforoClase(a)] - ordenUrgencia[semaforoClase(b)]);
+  // El nombre enlaza al perfil del docente (correo, telefono, historial):
+  // contactarlo es un proceso manual del admin fuera del sistema (no hay
+  // ningun RF de mensajeria/notificaciones, y la seccion 7.2 del documento
+  // de requisitos excluye integraciones externas) — lo que si le toca al
+  // sistema es dejarle a mano los datos de contacto en un clic.
+  document.getElementById("tablaSemaforo").innerHTML = inscripcionesOrdenadas.map(i => `
+    <tr>
+      <td><span class="semaforo ${semaforoClase(i)}"></span></td>
+      <td><a href="gestion_docentes.html?docente=${i.id_docente}" style="color:var(--info);">${nombreDocente(i.id_docente)}</a></td>
+      <td>${nombreCapacitacion(i.id_capacitacion)}</td>
+      <td>${semaforoTexto(i)}</td>
+    </tr>
+  `).join("");
+</script>
 </body>
 </html>

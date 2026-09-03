@@ -17,23 +17,16 @@
   <nav class="topnav">
     <div class="topnav-left"><img src="../img/certus_logo.png" alt="CERTUS" class="brand-logo"><span class="brand-divider"></span><span class="brand-label">Panel Docente</span></div>
     <div class="topnav-links">
-      <a href="perfil.html" class="active">Perfil</a>
       <a href="mis_capacitaciones.html">Mis capacitaciones</a>
       <a href="constancias.html">Constancias</a>
       <a href="mi_progreso.html">Mi progreso</a>
       <a href="mentores.html">Mentores</a>
+      <a href="perfil.html" class="active">Perfil</a>
     </div>
-    <div class="topnav-right" id="topnavRight">
-      <button class="notif-bell" type="button" aria-label="Notificaciones" title="Notificaciones"><i class="fa-solid fa-bell"></i></button>
-      <button class="topnav-icon-btn" type="button" aria-label="Centro de soporte" title="Centro de soporte"><i class="fa-solid fa-headset"></i></button>
-      <div class="topnav-avatar-wrap">
-        <a href="../login.html" class="topnav-avatar" aria-label="Volver al login" title="Volver al login"><i class="fa-solid fa-user"></i></a>
-      </div>
-    </div>
+    <div class="topnav-right" id="topnavRight"></div>
   </nav>
 
   <main class="main">
-    <!-- BLOQUE 1: Topbar (saludo) + Hero (especialidad y experiencia) -->
     <div class="topbar"><h1>Hola, <span id="nombreTopbar"></span></h1></div>
 
     <div class="profile-hero">
@@ -44,7 +37,7 @@
         <div class="especialidad-tag" id="pExperiencia"><i class="fa-solid fa-briefcase"></i></div>
       </div>
     </div>
-    <!-- BLOQUE 2: Tarjeta de perfil (avatar, nombre, mini-insignias, boton mentor) -->
+
     <div class="profile-card">
       <div class="profile-avatar-xl" id="avatar"></div>
       <div style="flex:1;min-width:200px;">
@@ -53,7 +46,9 @@
       </div>
       <a href="mentores.html" class="btn btn-outline btn-sm"><i class="fa-solid fa-people-group"></i> Buscar mentor</a>
     </div>
-    <!-- BLOQUE 3: Stats (Asignadas / Completadas / En curso / Pendientes) -->
+
+    <div class="insight-card" id="insightCard"></div>
+
     <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);margin:-.35rem 0 .5rem;">Tus capacitaciones</p>
     <div class="profile-stats stagger">
       <div class="card metric"><div class="num" id="statAsignadas">0</div><div class="lbl">Asignadas</div></div>
@@ -61,40 +56,338 @@
       <div class="card metric"><div class="num" id="statEnCurso">0</div><div class="lbl">En curso</div></div>
       <div class="card metric"><div class="num" id="statPendientes">0</div><div class="lbl">Pendientes</div></div>
     </div>
-    <!-- Los siguientes bloques (ciclo, avance, sobre mi, etc.) se agregan despues -->
+
+    <div class="card">
+      <h2 style="display:flex;justify-content:space-between;align-items:center;">
+        <span><i class="fa-solid fa-rotate"></i> Ciclo de actualizacion profesional</span>
+        <span style="font-size:12px;color:var(--text-muted);background:var(--bg);padding:3px 10px;border-radius:10px;" id="cicloPeriodo"></span>
+      </h2>
+      <div id="cicloContenido"></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card" style="display:flex;align-items:center;gap:1.25rem;">
+        <div style="width:100px;height:100px;position:relative;flex-shrink:0;">
+          <canvas id="chartAvance"></canvas>
+          <div id="pctAvance" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:var(--navy);">0%</div>
+        </div>
+        <div>
+          <h2 style="margin-bottom:.25rem;"><i class="fa-solid fa-chart-pie"></i> Mi avance</h2>
+          <p style="font-size:12px;color:var(--text-muted);">Porcentaje de capacitaciones completadas sobre el total asignado.</p>
+          <p style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);border-top:1px solid var(--border-color);margin:.75rem 0 0;padding-top:.6rem;">Otros logros</p>
+          <div style="display:flex;gap:1.25rem;margin-top:.4rem;">
+            <div><b style="display:block;font-size:16px;color:var(--navy);" id="statInsignias">0</b><span style="font-size:11px;color:var(--text-muted);">Insignias <span id="statInsigniasTotal"></span></span></div>
+            <div><b style="display:block;font-size:16px;color:var(--navy);" id="statConstancias">0</b><span style="font-size:11px;color:var(--text-muted);">Constancias</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><i class="fa-solid fa-calendar-days"></i> Proximas capacitaciones</h2>
+        <div id="proximas"></div>
+      </div>
+    </div>
+
+    <div class="grid-2" style="align-items:start;">
+      <div class="card">
+        <h2 style="display:flex;justify-content:space-between;align-items:center;">
+          <span><i class="fa-solid fa-id-card"></i> Sobre mi</span>
+          <button class="btn btn-outline btn-sm" onclick="abrirContacto()"><i class="fa-solid fa-address-card"></i> Datos de contacto</button>
+        </h2>
+        <p style="font-size:13px;color:var(--text);line-height:1.65;margin-bottom:1.1rem;" id="pBio"></p>
+        <table class="table-kv">
+          <tr><td style="color:var(--text-muted);width:110px;">Especialidad</td><td id="pEspecialidad2"></td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2 style="display:flex;justify-content:space-between;align-items:center;">
+          <span><i class="fa-solid fa-award"></i> Insignias destacadas</span>
+          <a href="mi_progreso.html" id="linkVerInsignias" style="font-size:11.5px;font-weight:600;color:var(--info);"><i class="fa-solid fa-arrow-right"></i> Ver todas</a>
+        </h2>
+        <p id="resumenInsigniasMini" style="font-size:11px;color:var(--text-muted);margin:-.3rem 0 .6rem;"></p>
+        <div class="insignias-grid" id="gridInsigniasMini" style="margin-bottom:1rem;"></div>
+        <h2><i class="fa-solid fa-clock-rotate-left"></i> Historial reciente</h2>
+        <div class="timeline" id="timelineHistorial"></div>
+      </div>
+    </div>
+
+    <div class="card" id="cardAreaDocentes" style="display:none;">
+      <h2><i class="fa-solid fa-people-group"></i> Docentes de tu area</h2>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:.85rem;">Otros docentes de <b id="areaNombre"></b> — una red de apoyo entre pares (inspirado en las comunidades de practica docente).</p>
+      <div class="area-docentes-grid" id="gridAreaDocentes"></div>
+    </div>
   </main>
 </div>
 
+<div class="modal-overlay" id="modalColega">
+  <div class="modal-box" style="width:380px;text-align:left;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem;">
+      <div class="profile-avatar-xl" id="colegaAvatar" style="width:56px;height:56px;font-size:18px;margin-top:0;"></div>
+      <div>
+        <h3 id="colegaNombre" style="margin-bottom:2px;"></h3>
+        <span style="font-size:12px;color:var(--text-muted);" id="colegaExperiencia"></span>
+      </div>
+    </div>
+    <p style="font-size:13px;color:var(--text);line-height:1.6;margin-bottom:1rem;" id="colegaBio"></p>
+    <table class="table-kv" style="margin-bottom:1rem;">
+      <tr><td style="color:var(--text-muted);width:110px;">Especialidad</td><td id="colegaEspecialidad"></td></tr>
+    </table>
+    <p style="font-size:11px;color:var(--text-muted);margin-bottom:1rem;"><i class="fa-solid fa-circle-info"></i> Directorio de solo lectura — para coordinar con un colega, contacta a Gestion Docente.</p>
+    <div style="display:flex;justify-content:flex-end;">
+      <button class="btn btn-outline btn-sm" onclick="cerrarColega()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalContacto">
+  <div class="modal-box" style="width:360px;text-align:left;">
+    <h3 style="margin-bottom:1rem;"><i class="fa-solid fa-address-card"></i> Datos de contacto</h3>
+    <table class="table-kv">
+      <tr><td style="color:var(--text-muted);width:110px;">Correo</td><td id="cCorreo"></td></tr>
+      <tr><td style="color:var(--text-muted);">DNI</td><td id="cDni"></td></tr>
+      <tr><td style="color:var(--text-muted);">Telefono</td><td id="cTelefono"></td></tr>
+    </table>
+    <p style="font-size:11.5px;color:var(--text-muted);margin-top:.85rem;"><i class="fa-solid fa-lock"></i> Solo visible para ti y para el administrador.</p>
+    <div style="display:flex;justify-content:flex-end;margin-top:1.1rem;">
+      <button class="btn btn-outline btn-sm" onclick="cerrarContacto()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="../js/data.js"></script>
 <script src="../js/app.js"></script>
 <script>
-  // BLOQUE 1: por ahora usamos un docente fijo de prueba (id 1) en vez de
-  // requireSesion("docente"), porque login.html todavia no guarda la sesion
-  // real (eso lo conecta tu companero). Cuando lo haga, esta linea cambia a:
-  //   const sesion = requireSesion("docente");
-  //   const docente = DOCENTES.find(d => d.id === sesion.id);
-  const docente = DOCENTES.find(d => d.id === 1);
+  const sesion = requireSesion("docente");
+  const docente = DOCENTES.find(d => d.id === sesion.id);
+  const insignias = insigniasDeDocente(sesion.id);
+  const ganadas = insignias.filter(i => i.ganada).length;
+  const misInscripciones = INSCRIPCIONES.filter(i => i.id_docente === sesion.id);
+  const completadas = misInscripciones.filter(i => i.estado === "completada");
+  const enCurso = misInscripciones.filter(i => i.estado === "en curso");
+  const pendientes = misInscripciones.filter(i => i.estado === "pendiente");
+  const misConstancias = CONSTANCIAS.filter(c => completadas.some(i => i.id === c.id_inscripcion));
 
-  document.getElementById("nombreTopbar").textContent = docente.nombres;
+  document.getElementById("nombreTopbar").textContent = sesion.nombre;
+  document.getElementById("avatar").textContent = (docente.nombres[0] + docente.apellidos[0]);
+  document.getElementById("nombreCompleto").textContent = docente.nombres + " " + docente.apellidos;
+  document.getElementById("miniInsignias").innerHTML = `${ganadas} de ${insignias.length} insignias · <a href="mi_progreso.html" style="color:var(--info);">Ver mi progreso</a>`;
+  // El "7" de insignias ganadas se veia contradictorio junto al "Ver las 12"
+  // (que ademas estaba escrito a mano). Ahora ambos se calculan del mismo
+  // arreglo y el "de 12" queda explicito junto al numero de ganadas.
+  document.getElementById("statInsigniasTotal").textContent = `de ${insignias.length}`;
+  document.getElementById("linkVerInsignias").innerHTML = `<i class="fa-solid fa-arrow-right"></i> Ver las ${insignias.length}`;
+  document.getElementById("pBio").textContent = docente.bio;
   document.getElementById("pEspecialidad").innerHTML = `<i class="fa-solid fa-bullseye"></i> ${docente.especialidad}`;
+  document.getElementById("pEspecialidad2").textContent = docente.especialidad;
   document.getElementById("pExperiencia").innerHTML = `<i class="fa-solid fa-briefcase"></i> ${docente.anios_experiencia} anos de experiencia`;
 
-  // BLOQUE 2: avatar con iniciales, nombre completo y mini-resumen de
-  // insignias. En 0 por ahora, porque INSIGNIAS todavia esta vacio en
-  // data.js -- cuando se cargue esa data real, esto se reemplaza por
-  // insigniasDeDocente(docente.id).
-  const insigniasGanadas = 0;
-  const insigniasTotal = 0;
-  document.getElementById("avatar").textContent = docente.nombres[0] + docente.apellidos[0];
-  document.getElementById("nombreCompleto").textContent = docente.nombres + " " + docente.apellidos;
-  document.getElementById("miniInsignias").innerHTML = `${insigniasGanadas} de ${insigniasTotal} insignias · <a href="mi_progreso.html" style="color:var(--info);">Ver mi progreso</a>`;
+  // Datos de contacto (MEJORA): DNI/correo/telefono ya no viven en el
+  // dashboard principal; se muestran solo bajo demanda en este modal.
+  function abrirContacto(){
+    document.getElementById("cCorreo").textContent = docente.correo;
+    document.getElementById("cDni").textContent = docente.dni;
+    document.getElementById("cTelefono").textContent = docente.telefono;
+    document.getElementById("modalContacto").classList.add("open");
+  }
+  function cerrarContacto(){
+    document.getElementById("modalContacto").classList.remove("open");
+  }
 
-  // BLOQUE 3: stats de capacitaciones. En 0 hasta que INSCRIPCIONES tenga
-  // datos -- luego se calcula filtrando por id_docente y estado.
-  animateCount(document.getElementById("statAsignadas"), 0);
-  animateCount(document.getElementById("statCompletadas"), 0);
-  animateCount(document.getElementById("statEnCurso"), 0);
-  animateCount(document.getElementById("statPendientes"), 0);
+  // Resumen inteligente: prioriza lo mas urgente con reglas simples sobre
+  // tus propios datos (fecha_limite mas cercana). Se aclara explicitamente
+  // que no es un modelo de IA, igual que el Asistente CERTUS.
+  const proximaAVencer = misInscripciones
+    .filter(i => i.estado !== "completada")
+    .sort((a,b) => new Date(a.fecha_limite) - new Date(b.fecha_limite))[0];
+  const insightCard = document.getElementById("insightCard");
+  const iconoNoIA = `<i class="fa-solid fa-circle-info" title="Calculado con reglas sobre tus propios datos, no es un modelo de IA."></i>`;
+  if(proximaAVencer){
+    const capProx = CAPACITACIONES.find(c => c.id === proximaAVencer.id_capacitacion);
+    const clase = semaforoClase(proximaAVencer);
+    const tag = clase === "semaforo-rojo" ? "Vencida" : clase === "semaforo-ambar" ? "Por vencer" : "En progreso";
+    insightCard.innerHTML = `
+      <div class="spark"><i class="fa-solid fa-sparkles"></i></div>
+      <div class="txt"><span class="tag">${tag} · Resumen inteligente ${iconoNoIA}</span>
+      Tu prioridad ahora es <b>"${capProx.titulo}"</b> (vence ${proximaAVencer.fecha_limite}). Completala para mantener tu avance al dia.</div>
+    `;
+  } else {
+    insightCard.innerHTML = `
+      <div class="spark"><i class="fa-solid fa-sparkles"></i></div>
+      <div class="txt"><span class="tag">Al dia · Resumen inteligente ${iconoNoIA}</span>
+      Completaste todas tus capacitaciones asignadas. Revisa tus insignias mas abajo.</div>
+    `;
+  }
+
+  animateCount(document.getElementById("statAsignadas"), misInscripciones.length);
+  animateCount(document.getElementById("statCompletadas"), completadas.length);
+  animateCount(document.getElementById("statEnCurso"), enCurso.length);
+  animateCount(document.getElementById("statPendientes"), pendientes.length);
+  animateCount(document.getElementById("statInsignias"), ganadas);
+  animateCount(document.getElementById("statConstancias"), misConstancias.length);
+
+  new Chart(document.getElementById("chartAvance"), {
+    type: "doughnut",
+    data: {
+      labels: ["Completadas", "Restantes"],
+      datasets: [{
+        data: [completadas.length, Math.max(0, misInscripciones.length - completadas.length)],
+        backgroundColor: ["#64a44e", "#e5e7eb"],
+        borderWidth: 0
+      }]
+    },
+    options: { cutout: "72%", plugins: { legend: { display: false }, tooltip: { enabled: false } } }
+  });
+  // El anillo antes no mostraba ningun numero — solo color, sin decir que
+  // porcentaje representa. Se agrega el % en el centro, igual que el anillo
+  // de Mi progreso.
+  const pctAvance = misInscripciones.length ? Math.round(completadas.length / misInscripciones.length * 100) : 0;
+  animateCount(document.getElementById("pctAvance"), pctAvance, "%");
+
+  document.getElementById("proximas").innerHTML = misInscripciones
+    .filter(i => i.estado !== "completada")
+    .map(i => {
+      const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
+      return `<a href="detalle.html?id=${i.id}" class="proxima-item">
+        <div class="p-info"><b>${cap.titulo}</b><span>${cap.fecha} · ${cap.sede}</span></div>
+        <div class="p-right">
+          <span class="semaforo ${semaforoClase(i)}" title="${semaforoTexto(i)}"></span>
+          <span class="badge ${badgeClase(i.estado)}">${badgeTexto(i.estado)}</span>
+          <i class="fa-solid fa-chevron-right"></i>
+        </div>
+      </a>`;
+    }).join("") || "<p style='font-size:13px;color:var(--text-muted);'>No tienes capacitaciones pendientes.</p>";
+
+  const insigniasDestacadas = [...insignias].sort((a,b) => (b.ganada - a.ganada)).slice(0,4);
+  // Antes esta tarjeta no conectaba sus propios numeros: mostraba 4 iconos
+  // sin decir que eran una vista previa, mientras el "7 de 12" vivia solo en
+  // la tarjeta de Mi avance. Ahora lo dice explicitamente aqui tambien.
+  document.getElementById("resumenInsigniasMini").textContent =
+    `Vista previa — tienes ${ganadas} de ${insignias.length} insignias obtenidas.`;
+  document.getElementById("gridInsigniasMini").innerHTML = insigniasDestacadas.map(ins => `
+    <div class="insignia ${ins.ganada ? "ganada" : "bloqueada"}" title="${ins.requisito || ""}">
+      <div class="icono"><i class="fa-solid ${ins.ganada ? iconoInsignia(ins.icono) : "fa-lock"}"></i></div>
+      <div class="nombre">${ins.nombre}</div>
+    </div>
+  `).join("");
+
+  // Linea de tiempo de hitos (MEJORA): combina capacitaciones con sesiones de
+  // mentoria, no solo capacitaciones (patron de "milestone dashboard" de TeachBoost).
+  const historialCaps = misInscripciones.map(i => {
+    const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
+    return {
+      fecha: i.fecha_actualizacion || i.fecha_inscripcion,
+      texto: cap.titulo,
+      etiqueta: badgeTexto(i.estado),
+      pend: i.estado !== "completada"
+    };
+  });
+  const historialSesiones = sesionesDeDocente(sesion.id).map(s => {
+    const m = MENTORES.find(x => x.id === s.id_mentor);
+    return {
+      fecha: s.fecha_creacion,
+      texto: `Sesion con ${m ? m.nombres : "mentor"}: ${s.meta}`,
+      etiqueta: s.estado === "completada" ? "Completada" : "Agendada",
+      pend: s.estado !== "completada"
+    };
+  });
+  const historial = [...historialCaps, ...historialSesiones]
+    .sort((a,b) => new Date(b.fecha) - new Date(a.fecha))
+    .slice(0, 6);
+  document.getElementById("timelineHistorial").innerHTML = historial.map(h => `
+    <div class="timeline-item ${h.pend ? "pend" : ""}">
+      <b>${h.texto}</b>
+      <span>${h.etiqueta} · ${h.fecha}</span>
+    </div>
+  `).join("") || `<p style="font-size:12.5px;color:var(--text-muted);">Aun no tienes historial.</p>`;
+
+  // Ciclo de actualizacion profesional (MEJORA — inspirado en el
+  // "Professional Update" de MyGTCS, GTC Scotland). Cierra formalmente
+  // el periodo del Plan de desarrollo con la confirmacion del
+  // administrador (el "supervisor" en CERTUS). No duplica el plan:
+  // reutiliza sus metas y solo agrega el paso de confirmacion.
+  function renderCiclo(){
+    const plan = planDeDocente(sesion.id);
+    const ciclo = estadoCiclo(sesion.id, plan.periodo);
+    document.getElementById("cicloPeriodo").textContent = plan.periodo;
+
+    const metasOk = plan.metas.length > 0;
+    const cumplidasOk = metasOk && plan.metas.every(m => m.estado === "cumplida");
+    const confirmadoOk = ciclo && ciclo.estado === "confirmado";
+    const solicitado = ciclo && ciclo.estado === "solicitado";
+
+    const paso = (ok, texto) => `
+      <div class="ciclo-step">
+        <div class="ciclo-step-circle ${ok ? "done" : ""}"><i class="fa-solid ${ok ? "fa-check" : "fa-clock"}"></i></div>
+        <span>${texto}</span>
+      </div>`;
+
+    let banner = "";
+    let boton = "";
+    if(confirmadoOk){
+      banner = `<div class="ciclo-banner confirmado"><i class="fa-solid fa-circle-check"></i> Confirmado por ${ciclo.confirmado_por} el ${ciclo.fecha_confirmacion}.</div>`;
+    } else if(solicitado){
+      banner = `<div class="ciclo-banner pendiente"><i class="fa-solid fa-hourglass-half"></i> Solicitud enviada el ${ciclo.fecha_solicitud}. Esperando confirmacion del administrador.</div>`;
+    } else if(!metasOk){
+      banner = `<div class="ciclo-banner neutro"><i class="fa-solid fa-circle-info"></i> Define tus metas en <a href="mi_progreso.html" style="color:var(--info);">Mi progreso</a> antes de solicitar la confirmacion de este ciclo.</div>`;
+    } else {
+      banner = `<div class="ciclo-banner neutro"><i class="fa-solid fa-circle-info"></i> Cuando termines tus metas, puedes pedirle al administrador que confirme este ciclo.</div>`;
+      boton = `<button class="btn btn-outline btn-sm" onclick="pedirConfirmacionCiclo()"><i class="fa-solid fa-paper-plane"></i> Solicitar confirmacion</button>`;
+    }
+
+    document.getElementById("cicloContenido").innerHTML = `
+      <div class="ciclo-stepper">
+        ${paso(metasOk, "Metas")}
+        <div class="ciclo-step-line ${metasOk ? "done" : ""}"></div>
+        ${paso(cumplidasOk, "Cumplidas")}
+        <div class="ciclo-step-line ${cumplidasOk ? "done" : ""}"></div>
+        ${paso(confirmadoOk, "Confirmacion")}
+      </div>
+      ${banner}
+      ${boton}
+    `;
+  }
+  function pedirConfirmacionCiclo(){
+    const plan = planDeDocente(sesion.id);
+    solicitarConfirmacionCiclo(sesion.id, plan.periodo);
+    showToast("Solicitud enviada al administrador", "success");
+    renderCiclo();
+  }
+  renderCiclo();
+
+  // Docentes de tu misma area (MEJORA — PLC ligero)
+  const colegas = docentesDeArea(docente.especialidad, docente.id);
+  if(colegas.length){
+    document.getElementById("cardAreaDocentes").style.display = "block";
+    document.getElementById("areaNombre").textContent = docente.especialidad;
+    document.getElementById("gridAreaDocentes").innerHTML = colegas.map(c => `
+      <div class="area-docente-card" onclick="abrirColega(${c.id})">
+        <div class="avatar">${c.nombres[0]}${c.apellidos[0]}</div>
+        <div>
+          <b>${c.nombres} ${c.apellidos}</b>
+          <span>${c.anios_experiencia} anos de experiencia</span>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  // Antes esta tarjeta no hacia nada al hacer clic — el unico directorio de
+  // personas en toda la app sin ninguna interaccion. Se agrega un perfil
+  // basico de solo lectura (sin mensajeria, que quedo fuera de alcance).
+  function abrirColega(id){
+    const c = DOCENTES.find(d => d.id === id);
+    if(!c) return;
+    document.getElementById("colegaAvatar").textContent = c.nombres[0] + c.apellidos[0];
+    document.getElementById("colegaNombre").textContent = c.nombres + " " + c.apellidos;
+    document.getElementById("colegaExperiencia").textContent = `${c.anios_experiencia} anos de experiencia`;
+    document.getElementById("colegaBio").textContent = c.bio;
+    document.getElementById("colegaEspecialidad").textContent = c.especialidad;
+    document.getElementById("modalColega").classList.add("open");
+  }
+  function cerrarColega(){
+    document.getElementById("modalColega").classList.remove("open");
+  }
 </script>
 </body>
 </html>

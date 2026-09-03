@@ -24,18 +24,181 @@
       <a href="reportes.html">Reportes</a>
       <a href="mentores.html">Mentores</a>
     </div>
-    <div class="topnav-right" id="topnavRight">
-      <button class="notif-bell" type="button" aria-label="Notificaciones" title="Notificaciones"><i class="fa-solid fa-bell"></i></button>
-      <button class="topnav-icon-btn" type="button" aria-label="Centro de soporte" title="Centro de soporte"><i class="fa-solid fa-headset"></i></button>
-      <div class="topnav-avatar-wrap">
-        <a href="../login.html" class="topnav-avatar" aria-label="Volver al login" title="Volver al login"><i class="fa-solid fa-user"></i></a>
-      </div>
-    </div>
+    <div class="topnav-right" id="topnavRight"></div>
   </nav>
 
   <main class="main">
-    <!-- Contenido de la pagina: se construye despues. Por ahora solo el navbar. -->
+    <div class="topbar">
+      <h1>Administradores</h1>
+      <button class="btn btn-primary" onclick="abrirNuevo()"><i class="fa-solid fa-user-plus"></i> Nuevo administrador</button>
+    </div>
+
+    <p style="font-size:12.5px;color:var(--text-muted);margin:-.75rem 0 1rem;"><i class="fa-solid fa-circle-info"></i> RF-03/RF-05: quienes tienen acceso al panel administrador, con el mismo control de alta/edicion/baja que Gestion de docentes.</p>
+    <table>
+      <thead><tr><th>Nombre</th><th>Correo</th><th>Telefono</th><th></th></tr></thead>
+      <tbody id="tablaAdmins"></tbody>
+    </table>
   </main>
 </div>
+
+<div class="modal-overlay" id="modalAdmin">
+  <div class="modal-box" style="width:400px;text-align:left;">
+    <h3 id="tituloModal">Nuevo administrador</h3>
+    <div class="form-group"><label>Nombres</label><input type="text" id="fNombres"></div>
+    <div class="form-group"><label>Apellidos</label><input type="text" id="fApellidos"></div>
+    <div class="form-group"><label>Correo institucional</label><input type="email" id="fCorreo" placeholder="nombre.apellido@certus.edu.pe"></div>
+    <div class="form-group"><label>Telefono</label><input type="text" id="fTelefono"></div>
+    <p id="errorAdmin" style="font-size:12px;color:var(--danger);margin-bottom:.5rem;display:none;"></p>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="cerrarModal()"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarAdmin()"><i class="fa-solid fa-check"></i> Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalDesactivar">
+  <div class="modal-box" style="width:380px;text-align:left;">
+    <h3><i class="fa-solid fa-user-slash"></i> Desactivar administrador</h3>
+    <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:1rem;">Vas a desactivar a <b id="nombreDesactivar" style="color:var(--text);"></b>. No podra iniciar sesion hasta que lo reactives.</p>
+    <div class="form-group">
+      <label>Motivo de la baja</label>
+      <select id="fMotivoBaja" style="width:100%;padding:9px 11px;border:1px solid var(--secondary);border-radius:8px;font-size:13px;font-family:inherit;background:var(--surface);color:var(--text);">
+        <option value="">Selecciona un motivo...</option>
+        <option value="Cese">Cese</option>
+        <option value="Cambio de rol">Cambio de rol</option>
+        <option value="Licencia">Licencia (ausencia temporal)</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:.5rem;">
+      <button class="btn btn-outline" onclick="cerrarDesactivar()"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+      <button class="btn btn-danger" onclick="confirmarDesactivar()"><i class="fa-solid fa-user-slash"></i> Desactivar</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/data.js"></script>
+<script src="../js/app.js"></script>
+<script>
+  const sesionActual = requireSesion("admin");
+
+  function iniciales(nombres, apellidos){ return (nombres[0] + apellidos[0]).toUpperCase(); }
+
+  function render(){
+    document.getElementById("tablaAdmins").innerHTML = ADMINISTRADORES.map(a => {
+      const inactivo = estadoAdmin(a.id);
+      return `
+      <tr>
+        <td>${a.nombres} ${a.apellidos} ${inactivo ? `<span class="tag-inactivo">Inactivo</span>` : ""} ${a.id === sesionActual.id ? `<span style="font-size:10px;color:var(--text-muted);">(tu)</span>` : ""}</td>
+        <td>${a.correo}</td>
+        <td>${a.telefono || "-"}</td>
+        <td style="display:flex;gap:6px;">
+          <button class="btn btn-outline btn-sm" onclick="abrirEditar(${a.id})"><i class="fa-solid fa-pen"></i> Editar</button>
+          ${inactivo
+            ? `<button class="btn btn-outline btn-sm" onclick="reactivarAdmin(${a.id})"><i class="fa-solid fa-rotate-left"></i> Reactivar</button>`
+            : `<button class="btn btn-danger btn-sm" onclick="abrirDesactivar(${a.id})" ${puedeDesactivar(a.id) ? "" : "disabled title='Debe quedar al menos un administrador activo'"}><i class="fa-solid fa-user-slash"></i> Desactivar</button>`}
+        </td>
+      </tr>
+    `;
+    }).join("");
+  }
+
+  // Regla de seguridad real (no esta en un RF puntual, pero evita un
+  // bloqueo total del sistema): no se puede desactivar al ultimo
+  // administrador activo, o nadie podria volver a entrar al panel admin.
+  function puedeDesactivar(idAdmin){
+    const activos = ADMINISTRADORES.filter(a => !estadoAdmin(a.id));
+    return !(activos.length === 1 && activos[0].id === idAdmin);
+  }
+
+  render();
+
+  let docenteADesactivar = null; // reutiliza el nombre de variable del patron de gestion_docentes
+  function abrirDesactivar(id){
+    docenteADesactivar = id;
+    const a = ADMINISTRADORES.find(x => x.id === id);
+    document.getElementById("nombreDesactivar").textContent = `${a.nombres} ${a.apellidos}`;
+    document.getElementById("fMotivoBaja").value = "";
+    document.getElementById("modalDesactivar").classList.add("open");
+  }
+  function cerrarDesactivar(){
+    document.getElementById("modalDesactivar").classList.remove("open");
+  }
+  function confirmarDesactivar(){
+    const motivo = document.getElementById("fMotivoBaja").value;
+    if(!motivo){ showToast("Elige un motivo antes de continuar", "error"); return; }
+    desactivarAdminLocal(docenteADesactivar, motivo);
+    cerrarDesactivar();
+    render();
+    showToast("Administrador desactivado.", "info");
+  }
+  function reactivarAdmin(id){
+    reactivarAdminLocal(id);
+    render();
+    showToast("Administrador reactivado", "success");
+  }
+
+  let adminEnEdicion = null;
+  function abrirNuevo(){
+    adminEnEdicion = null;
+    document.getElementById("tituloModal").textContent = "Nuevo administrador";
+    ["fNombres","fApellidos","fCorreo","fTelefono"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("errorAdmin").style.display = "none";
+    document.getElementById("modalAdmin").classList.add("open");
+  }
+  function abrirEditar(id){
+    const a = ADMINISTRADORES.find(x => x.id === id);
+    adminEnEdicion = id;
+    document.getElementById("tituloModal").textContent = "Editar administrador";
+    document.getElementById("fNombres").value = a.nombres;
+    document.getElementById("fApellidos").value = a.apellidos;
+    document.getElementById("fCorreo").value = a.correo;
+    document.getElementById("fTelefono").value = a.telefono || "";
+    document.getElementById("errorAdmin").style.display = "none";
+    document.getElementById("modalAdmin").classList.add("open");
+  }
+  function guardarAdmin(){
+    const datos = {
+      nombres: document.getElementById("fNombres").value.trim(),
+      apellidos: document.getElementById("fApellidos").value.trim(),
+      correo: document.getElementById("fCorreo").value.trim(),
+      telefono: document.getElementById("fTelefono").value.trim()
+    };
+    const errorEl = document.getElementById("errorAdmin");
+    if(!datos.nombres || !datos.apellidos || !datos.correo){
+      errorEl.textContent = "Completa nombres, apellidos y correo antes de guardar.";
+      errorEl.style.display = "block";
+      return;
+    }
+    // Mismas 2 validaciones que Gestion de docentes: dominio institucional
+    // (si no, esta cuenta jamas podria iniciar sesion) y correo unico.
+    if(!datos.correo.toLowerCase().endsWith("@certus.edu.pe")){
+      errorEl.textContent = "El correo debe terminar en @certus.edu.pe — si no, no podra iniciar sesion.";
+      errorEl.style.display = "block";
+      return;
+    }
+    const correoDuplicado = ADMINISTRADORES.some(a => a.id !== adminEnEdicion && a.correo.toLowerCase() === datos.correo.toLowerCase());
+    if(correoDuplicado){
+      errorEl.textContent = "Ya existe un administrador registrado con ese correo.";
+      errorEl.style.display = "block";
+      return;
+    }
+    errorEl.style.display = "none";
+
+    if(adminEnEdicion){
+      guardarAdminOverride(adminEnEdicion, datos);
+      const a = ADMINISTRADORES.find(x => x.id === adminEnEdicion);
+      Object.assign(a, datos, {editado_por: sesionActual.nombre, fecha_edicion: new Date().toISOString().slice(0,10)});
+    } else {
+      const nuevo = crearAdminLocal(datos);
+      ADMINISTRADORES.push(nuevo);
+    }
+    cerrarModal();
+    render();
+    showToast("Administrador guardado correctamente", "success");
+  }
+  function cerrarModal(){
+    document.getElementById("modalAdmin").classList.remove("open");
+  }
+</script>
 </body>
 </html>

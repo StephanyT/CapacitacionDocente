@@ -24,18 +24,360 @@
       <a href="reportes.html">Reportes</a>
       <a href="mentores.html">Mentores</a>
     </div>
-    <div class="topnav-right" id="topnavRight">
-      <button class="notif-bell" type="button" aria-label="Notificaciones" title="Notificaciones"><i class="fa-solid fa-bell"></i></button>
-      <button class="topnav-icon-btn" type="button" aria-label="Centro de soporte" title="Centro de soporte"><i class="fa-solid fa-headset"></i></button>
-      <div class="topnav-avatar-wrap">
-        <a href="../login.html" class="topnav-avatar" aria-label="Volver al login" title="Volver al login"><i class="fa-solid fa-user"></i></a>
-      </div>
-    </div>
+    <div class="topnav-right" id="topnavRight"></div>
   </nav>
 
   <main class="main">
-    <!-- Contenido de la pagina: se construye despues. Por ahora solo el navbar. -->
+    <div class="topbar">
+      <h1>Gestion de capacitaciones</h1>
+      <button class="btn btn-primary" onclick="abrirNueva()"><i class="fa-solid fa-plus"></i> Nueva capacitacion</button>
+    </div>
+
+    <table>
+      <thead><tr><th>Titulo</th><th>Fecha</th><th>Sede</th><th>Programa</th><th>Estado</th><th>Docentes</th><th></th></tr></thead>
+      <tbody id="tablaCapacitaciones"></tbody>
+    </table>
+    <nav aria-label="Paginacion de capacitaciones" style="margin-top:1rem;">
+      <ul class="pager" id="paginacionCapacitaciones"></ul>
+    </nav>
+
+    <div class="card" id="cardSolicitudes" style="margin-top:1rem;display:none;">
+      <h2><i class="fa-solid fa-inbox"></i> Solicitudes de acceso a capacitaciones</h2>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:.85rem;"><i class="fa-solid fa-circle-info"></i> Docentes que pidieron acceso a una capacitacion del catalogo que aun no tenian asignada. Aprobar crea la inscripcion (RF-08); rechazar solo cierra la solicitud.</p>
+      <div id="listaSolicitudesAdmin"></div>
+    </div>
+
+    <div class="card" id="cardSugerencias" style="margin-top:1rem;display:none;">
+      <h2><i class="fa-solid fa-lightbulb"></i> Sugerencias de los docentes</h2>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:.85rem;"><i class="fa-solid fa-circle-info"></i> Temas que los docentes propusieron (needs assessment) — usalas como señal al crear nuevas capacitaciones.</p>
+      <div id="listaSugerenciasAdmin"></div>
+    </div>
   </main>
 </div>
+
+<!-- Modal Nueva/Editar capacitacion -->
+<div class="modal-overlay" id="modalForm">
+  <div class="modal-box" style="width:420px;text-align:left;">
+    <h3 id="tituloModalForm">Nueva capacitacion</h3>
+    <div class="form-group"><label>Titulo</label><input type="text" id="fTitulo"></div>
+    <div class="form-group"><label>Descripcion</label><textarea id="fDescripcion" rows="2"></textarea></div>
+    <div class="grid-2">
+      <div class="form-group"><label>Fecha</label><input type="date" id="fFecha"></div>
+      <div class="form-group"><label>Duracion</label><input type="text" id="fDuracion" placeholder="8 horas"></div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Sede</label>
+        <select id="fSede"><option>Lima Centro</option><option>Lima Norte</option><option>Arequipa</option><option>Aula Virtual</option></select>
+      </div>
+      <div class="form-group">
+        <label>Programa</label>
+        <select id="fPrograma"><option>Diseno y Desarrollo de Software</option><option>Administracion</option><option>Marketing</option><option>Idiomas</option><option>Psicologia</option></select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Asignar a docentes (RF-08)</label>
+      <div id="listaCheckDocentes" style="max-height:110px;overflow-y:auto;border:1px solid #ced4da;border-radius:8px;padding:8px;"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:.5rem;">
+      <button class="btn btn-outline" onclick="cerrarModales()"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarCapacitacion()"><i class="fa-solid fa-check"></i> Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Docentes de la capacitacion -->
+<div class="modal-overlay" id="modalDocentes">
+  <div class="modal-box" style="width:460px;text-align:left;">
+    <h3 id="tituloModalDocentes">Docentes de la capacitacion</h3>
+    <table style="margin-top:.75rem;">
+      <thead><tr><th>Docente</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="tablaDocentesCap"></tbody>
+    </table>
+    <div style="text-align:right;margin-top:1rem;">
+      <button class="btn btn-outline" onclick="cerrarModales()"><i class="fa-solid fa-xmark"></i> Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/data.js"></script>
+<script src="../js/app.js"></script>
+<script>
+  requireSesion("admin");
+
+  function contarDocentes(idCap){
+    return INSCRIPCIONES.filter(i => i.id_capacitacion === idCap).length;
+  }
+
+  // Paginacion — mismo patron que gestion_docentes.html.
+  const CAPACITACIONES_POR_PAGINA = 5;
+  let paginaActualCapacitaciones = 1;
+
+  function cambiarPaginaCapacitaciones(pagina){
+    paginaActualCapacitaciones = pagina;
+    render();
+    window.scrollTo({top: 0, behavior: "smooth"});
+  }
+
+  function renderPaginacionCapacitaciones(totalPaginas){
+    const cont = document.getElementById("paginacionCapacitaciones");
+    if(!cont) return;
+    if(totalPaginas <= 1){ cont.innerHTML = ""; return; }
+    let html = `<li class="pager-item ${paginaActualCapacitaciones === 1 ? "disabled" : ""}">
+      <a class="pager-link" href="#" onclick="event.preventDefault();cambiarPaginaCapacitaciones(${paginaActualCapacitaciones - 1})">Anterior</a>
+    </li>`;
+    for(let p = 1; p <= totalPaginas; p++){
+      html += `<li class="pager-item ${p === paginaActualCapacitaciones ? "active" : ""}">
+        <a class="pager-link" href="#" onclick="event.preventDefault();cambiarPaginaCapacitaciones(${p})">${p}</a>
+      </li>`;
+    }
+    html += `<li class="pager-item ${paginaActualCapacitaciones === totalPaginas ? "disabled" : ""}">
+      <a class="pager-link" href="#" onclick="event.preventDefault();cambiarPaginaCapacitaciones(${paginaActualCapacitaciones + 1})">Siguiente</a>
+    </li>`;
+    cont.innerHTML = html;
+  }
+
+  function render(){
+    const totalPaginas = Math.max(1, Math.ceil(CAPACITACIONES.length / CAPACITACIONES_POR_PAGINA));
+    if(paginaActualCapacitaciones > totalPaginas) paginaActualCapacitaciones = totalPaginas;
+    const inicio = (paginaActualCapacitaciones - 1) * CAPACITACIONES_POR_PAGINA;
+    const pagina = CAPACITACIONES.slice(inicio, inicio + CAPACITACIONES_POR_PAGINA);
+
+    document.getElementById("tablaCapacitaciones").innerHTML = pagina.length ? pagina.map(c => `
+      <tr>
+        <td>${c.titulo}</td>
+        <td>${c.fecha}</td>
+        <td>${c.sede} ${esVirtual(c) ? `<i class="fa-solid fa-laptop" style="color:var(--info);" title="Aula Virtual"></i>` : ""}</td>
+        <td>${c.programa}</td>
+        <td><span class="badge badge-curso">${c.estado}</span></td>
+        <td>${contarDocentes(c.id)} asignados</td>
+        <td style="display:flex;gap:6px;">
+          <button class="btn btn-outline btn-sm" onclick="abrirEditar(${c.id})"><i class="fa-solid fa-pen"></i> Editar</button>
+          <button class="btn btn-outline btn-sm" onclick="abrirDocentes(${c.id})"><i class="fa-solid fa-users"></i> Docentes</button>
+        </td>
+      </tr>
+    `).join("") : `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Aun no hay capacitaciones registradas.</td></tr>`;
+
+    renderPaginacionCapacitaciones(totalPaginas);
+  }
+  render();
+
+  let idCapacitacionEnEdicion = null;
+
+  function renderCheckDocentes(idCap){
+    const asignadosIds = idCap
+      ? INSCRIPCIONES.filter(i => i.id_capacitacion === idCap).map(i => i.id_docente)
+      : [];
+    document.getElementById("listaCheckDocentes").innerHTML = DOCENTES.map(d => `
+      <label style="display:block;font-size:13px;margin:4px 0;">
+        <input type="checkbox" value="${d.id}" ${asignadosIds.includes(d.id) ? "checked" : ""}>
+        ${d.nombres} ${d.apellidos}
+      </label>
+    `).join("");
+  }
+
+  function abrirNueva(){
+    idCapacitacionEnEdicion = null;
+    document.getElementById("tituloModalForm").textContent = "Nueva capacitacion";
+    ["fTitulo","fDescripcion","fFecha","fDuracion"].forEach(id => document.getElementById(id).value = "");
+    renderCheckDocentes(null);
+    document.getElementById("modalForm").classList.add("open");
+  }
+  function abrirEditar(id){
+    idCapacitacionEnEdicion = id;
+    const c = CAPACITACIONES.find(x => x.id === id);
+    document.getElementById("tituloModalForm").textContent = "Editar capacitacion";
+    document.getElementById("fTitulo").value = c.titulo;
+    document.getElementById("fDescripcion").value = c.descripcion;
+    document.getElementById("fFecha").value = c.fecha;
+    document.getElementById("fDuracion").value = c.duracion;
+    document.getElementById("fSede").value = c.sede;
+    document.getElementById("fPrograma").value = c.programa;
+    renderCheckDocentes(id);
+    document.getElementById("modalForm").classList.add("open");
+  }
+  function guardarCapacitacion(){
+    const titulo = document.getElementById("fTitulo").value.trim();
+    if(!titulo){ showToast("El titulo es obligatorio", "error"); return; }
+
+    let idCap = idCapacitacionEnEdicion;
+    const datos = {
+      titulo,
+      descripcion: document.getElementById("fDescripcion").value,
+      fecha: document.getElementById("fFecha").value,
+      duracion: document.getElementById("fDuracion").value,
+      estado: "activa",
+      sede: document.getElementById("fSede").value,
+      programa: document.getElementById("fPrograma").value
+    };
+
+    if(idCap){
+      const cap = CAPACITACIONES.find(c => c.id === idCap);
+      const fechaAnterior = cap.fecha;
+      Object.assign(cap, datos);
+      // Si se reprogramo la fecha de la capacitacion, mover la fecha limite
+      // de los docentes que aun no completan por la misma cantidad de dias
+      // (preserva el margen original en vez de dejar el semaforo desincronizado
+      // del nuevo cronograma real).
+      if(datos.fecha && fechaAnterior && datos.fecha !== fechaAnterior){
+        const msPorDia = 1000 * 60 * 60 * 24;
+        const diffDias = Math.round((new Date(datos.fecha) - new Date(fechaAnterior)) / msPorDia);
+        INSCRIPCIONES.filter(i => i.id_capacitacion === idCap && i.estado !== "completada" && i.fecha_limite)
+          .forEach(i => {
+            const nuevaLimite = new Date(i.fecha_limite);
+            nuevaLimite.setDate(nuevaLimite.getDate() + diffDias);
+            i.fecha_limite = nuevaLimite.toISOString().slice(0, 10);
+          });
+      }
+    } else {
+      idCap = Math.max(0, ...CAPACITACIONES.map(c => c.id)) + 1;
+      CAPACITACIONES.push({id: idCap, ...datos});
+    }
+
+    // RF-08: asignar la capacitacion a los docentes marcados
+    const marcados = Array.from(document.querySelectorAll("#listaCheckDocentes input:checked")).map(el => parseInt(el.value));
+    marcados.forEach(idDoc => {
+      const yaExiste = INSCRIPCIONES.some(i => i.id_docente === idDoc && i.id_capacitacion === idCap);
+      if(!yaExiste){
+        const nuevoId = Math.max(0, ...INSCRIPCIONES.map(i => i.id)) + 1;
+        INSCRIPCIONES.push({
+          id: nuevoId, id_docente: idDoc, id_capacitacion: idCap,
+          estado: "pendiente", fecha_inscripcion: new Date().toISOString().slice(0,10),
+          fecha_limite: datos.fecha
+        });
+      }
+    });
+
+    cerrarModales();
+    showToast("Capacitacion guardada correctamente", "success");
+  }
+
+  function abrirDocentes(idCap){
+    const cap = CAPACITACIONES.find(c => c.id === idCap);
+    document.getElementById("tituloModalDocentes").textContent = "Docentes de: " + cap.titulo;
+    const inscritos = INSCRIPCIONES.filter(i => i.id_capacitacion === idCap);
+    document.getElementById("tablaDocentesCap").innerHTML = inscritos.map(i => `
+      <tr>
+        <td>${nombreDocente(i.id_docente)}</td>
+        <td><span class="badge ${badgeClase(i.estado)}">${badgeTexto(i.estado)}</span></td>
+        <td>
+          <select onchange="actualizarEstadoInscripcion(${i.id}, this.value, ${idCap})" style="font-size:12px;padding:4px;">
+            <option value="pendiente" ${i.estado==="pendiente"?"selected":""}>Pendiente</option>
+            <option value="en curso" ${i.estado==="en curso"?"selected":""}>En curso</option>
+            <option value="completada" ${i.estado==="completada"?"selected":""}>Completada</option>
+          </select>
+        </td>
+      </tr>
+    `).join("");
+    document.getElementById("modalDocentes").classList.add("open");
+  }
+
+  function actualizarEstadoInscripcion(idInscripcion, nuevoEstado, idCap){
+    const insc = INSCRIPCIONES.find(x => x.id === idInscripcion);
+    if(!insc) return;
+    insc.estado = nuevoEstado;
+    insc.fecha_actualizacion = new Date().toISOString().slice(0,10);
+
+    // RF-13: generar constancia automaticamente al completar (una sola vez, RN-05)
+    let constanciaNueva = false;
+    if(nuevoEstado === "completada"){
+      const yaTieneConstancia = CONSTANCIAS.some(c => c.id_inscripcion === idInscripcion);
+      if(!yaTieneConstancia){
+        const nuevoId = Math.max(0, ...CONSTANCIAS.map(c => c.id)) + 1;
+        const codigo = "CERTUS-2026-" + String(nuevoId).padStart(4, "0");
+        CONSTANCIAS.push({id: nuevoId, id_inscripcion: idInscripcion, codigo, fecha_emision: insc.fecha_actualizacion});
+        constanciaNueva = true;
+      }
+    }
+    // Antes esto se guardaba en silencio: ni confirmacion del cambio ni aviso
+    // de que se emitio una constancia real. La fila del modal tampoco se
+    // refrescaba, asi que el badge quedaba desactualizado hasta reabrirlo.
+    showToast(
+      constanciaNueva
+        ? `Estado actualizado a "${badgeTexto(nuevoEstado)}" — se emitio la constancia automaticamente.`
+        : `Estado actualizado a "${badgeTexto(nuevoEstado)}".`,
+      "success"
+    );
+    if(idCap) abrirDocentes(idCap);
+  }
+
+  function cerrarModales(){
+    document.getElementById("modalForm").classList.remove("open");
+    document.getElementById("modalDocentes").classList.remove("open");
+    render();
+  }
+
+  // ===== Solicitudes de acceso a capacitaciones (MEJORA) =====
+  function renderSolicitudes(){
+    const pendientes = todasLasSolicitudesPendientes();
+    const card = document.getElementById("cardSolicitudes");
+    if(pendientes.length === 0){ card.style.display = "none"; return; }
+    card.style.display = "block";
+    document.getElementById("listaSolicitudesAdmin").innerHTML = pendientes.map(s => {
+      const cap = CAPACITACIONES.find(c => c.id === s.id_capacitacion);
+      return `
+        <div class="review-item">
+          <div class="r-head">
+            <span>${cap ? cap.titulo : "Capacitacion eliminada"} · <span style="font-weight:400;color:var(--text-muted);">${nombreDocente(s.id_docente)}</span></span>
+            <span class="badge badge-pendiente">Pendiente</span>
+          </div>
+          <p style="font-size:12px;color:var(--text-muted);">Solicitada el ${s.fecha_solicitud}</p>
+          <div style="display:flex;gap:8px;margin-top:6px;">
+            <button class="btn btn-primary btn-sm" onclick="aprobarSolicitud(${s.id})"><i class="fa-solid fa-check"></i> Aprobar</button>
+            <button class="btn btn-outline btn-sm" onclick="rechazarSolicitud(${s.id})"><i class="fa-solid fa-xmark"></i> Rechazar</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+  renderSolicitudes();
+
+  function aprobarSolicitud(idSolicitud){
+    const sesion = getSesionActiva();
+    aprobarSolicitudCapacitacion(idSolicitud, (sesion||{}).nombre || "Admin");
+    showToast("Solicitud aprobada. Se creo la inscripcion del docente.", "success");
+    renderSolicitudes();
+    render();
+  }
+  function rechazarSolicitud(idSolicitud){
+    rechazarSolicitudCapacitacion(idSolicitud);
+    showToast("Solicitud rechazada", "success");
+    renderSolicitudes();
+  }
+
+  // ===== Sugerencias de los docentes (MEJORA — needs assessment) =====
+  function renderSugerencias(){
+    const todas = todasLasSugerencias();
+    const card = document.getElementById("cardSugerencias");
+    if(todas.length === 0){ card.style.display = "none"; return; }
+    card.style.display = "block";
+    document.getElementById("listaSugerenciasAdmin").innerHTML = todas.map(s => `
+      <div class="review-item">
+        <div class="r-head">
+          <span>${s.titulo} · <span style="font-weight:400;color:var(--text-muted);">${nombreDocente(s.id_docente)}</span></span>
+          <span class="badge ${s.estado === "atendida" ? "badge-completada" : "badge-pendiente"}">${s.estado === "atendida" ? "Atendida" : "Pendiente"}</span>
+        </div>
+        ${s.detalle ? `<p>${s.detalle}</p>` : ""}
+        ${s.estado !== "atendida" ? `
+          <div style="display:flex;gap:8px;margin-top:6px;">
+            <button class="btn btn-outline btn-sm" onclick="crearDesdeSugerencia('${s.titulo.replace(/'/g,"")}')"><i class="fa-solid fa-plus"></i> Crear capacitacion</button>
+            <button class="btn btn-outline btn-sm" onclick="atenderSugerencia(${s.id_docente}, ${s.id})"><i class="fa-solid fa-check"></i> Marcar atendida</button>
+          </div>
+        ` : ""}
+      </div>
+    `).join("");
+  }
+  renderSugerencias();
+
+  function atenderSugerencia(idDocente, idSugerencia){
+    marcarSugerenciaAtendida(idDocente, idSugerencia);
+    showToast("Sugerencia marcada como atendida", "success");
+    renderSugerencias();
+  }
+  function crearDesdeSugerencia(titulo){
+    abrirNueva();
+    document.getElementById("fTitulo").value = titulo;
+  }
+</script>
 </body>
 </html>

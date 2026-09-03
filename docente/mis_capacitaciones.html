@@ -17,24 +17,221 @@
   <nav class="topnav">
     <div class="topnav-left"><img src="../img/certus_logo.png" alt="CERTUS" class="brand-logo"><span class="brand-divider"></span><span class="brand-label">Panel Docente</span></div>
     <div class="topnav-links">
-      <a href="perfil.html">Perfil</a>
       <a href="mis_capacitaciones.html" class="active">Mis capacitaciones</a>
       <a href="constancias.html">Constancias</a>
       <a href="mi_progreso.html">Mi progreso</a>
       <a href="mentores.html">Mentores</a>
+      <a href="perfil.html">Perfil</a>
     </div>
-    <div class="topnav-right" id="topnavRight">
-      <button class="notif-bell" type="button" aria-label="Notificaciones" title="Notificaciones"><i class="fa-solid fa-bell"></i></button>
-      <button class="topnav-icon-btn" type="button" aria-label="Centro de soporte" title="Centro de soporte"><i class="fa-solid fa-headset"></i></button>
-      <div class="topnav-avatar-wrap">
-        <a href="../login.html" class="topnav-avatar" aria-label="Volver al login" title="Volver al login"><i class="fa-solid fa-user"></i></a>
-      </div>
-    </div>
+    <div class="topnav-right" id="topnavRight"></div>
   </nav>
 
   <main class="main">
-    <!-- Contenido de la pagina: se construye despues. Por ahora solo el navbar. -->
+    <div class="topbar">
+      <h1>Mis capacitaciones</h1>
+    </div>
+
+    <div class="chips">
+      <button class="chip active" data-estado="todas">Todas</button>
+      <button class="chip" data-estado="pendiente">Pendiente</button>
+      <button class="chip" data-estado="en curso">En curso</button>
+      <button class="chip" data-estado="completada">Completada</button>
+    </div>
+    <div class="search-box"><i class="fa-solid fa-magnifying-glass"></i><input type="text" placeholder="Buscar capacitacion..." id="buscador"></div>
+
+    <div id="listaCapacitaciones"></div>
+
+    <div class="card" style="margin-top:.5rem;">
+      <h2><i class="fa-solid fa-layer-group"></i> Capacitaciones disponibles</h2>
+      <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:1rem;">Otras capacitaciones que ofrece CERTUS y aun no tienes asignadas. Solo el administrador puede asignarlas — si te interesa alguna, coordina con Gestion Docente.</p>
+      <div id="listaDisponibles" class="stagger"></div>
+    </div>
+
+    <div class="card">
+      <h2><i class="fa-solid fa-lightbulb"></i> Sugerir un tema de capacitacion</h2>
+      <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:1rem;"><i class="fa-solid fa-circle-info"></i> ¿Hay algo que te gustaria que CERTUS ofrezca? Tu sugerencia queda visible para el administrador al momento de crear nuevas capacitaciones.</p>
+      <div class="form-group"><label>Tema sugerido</label><input type="text" id="sugTitulo" placeholder="Ej: Herramientas de IA para calificar ensayos"></div>
+      <div class="form-group"><label>¿Por que te interesa? (opcional)</label><textarea id="sugDetalle" rows="2" placeholder="Cuentanos un poco mas..."></textarea></div>
+      <button class="btn btn-primary btn-sm" id="btnEnviarSugerencia"><i class="fa-solid fa-paper-plane"></i> Enviar sugerencia</button>
+      <div id="listaSugerencias" style="margin-top:1rem;"></div>
+    </div>
   </main>
 </div>
+
+<div class="modal-overlay" id="modalDisponible">
+  <div class="modal-box wide" id="modalDisponibleBox"></div>
+</div>
+
+<!-- Modal capacitacion completada -->
+<div class="modal-overlay" id="modalCompletada">
+  <div class="modal-box">
+    <div class="icon-ok"><i class="fa-solid fa-check"></i></div>
+    <h3>Capacitacion completada</h3>
+    <p id="modalTexto"></p>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+      <a href="#" id="linkDetalleCompletada" class="btn btn-outline btn-sm"><i class="fa-solid fa-book-open"></i> Ver mas detalles</a>
+      <button class="btn btn-primary btn-sm" onclick="cerrarModal()"><i class="fa-solid fa-xmark"></i> Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.9.2/confetti.browser.min.js"></script>
+<script src="../js/data.js"></script>
+<script src="../js/app.js"></script>
+<script>
+  const sesion = requireSesion("docente");
+
+  const misInscripciones = INSCRIPCIONES.filter(i => i.id_docente === sesion.id);
+
+  function render(){
+    document.getElementById("listaCapacitaciones").innerHTML = misInscripciones.map(i => {
+      const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
+      const accion = i.estado === "completada"
+        ? `<button class="btn btn-outline btn-sm" onclick="verCompletada(${i.id})"><i class="fa-solid fa-eye"></i> Ver</button>`
+        : `<a href="detalle.html?id=${i.id}" class="btn btn-outline btn-sm"><i class="fa-solid fa-eye"></i> Ver detalle</a>`;
+      return `<div class="card" data-estado="${i.estado}" style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <b>${cap.titulo}</b><br>
+          <span style="font-size:12px;color:#6a737b;">${cap.fecha} · ${cap.duracion}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="badge ${badgeClase(i.estado)}">${badgeTexto(i.estado)}</span>
+          ${accion}
+        </div>
+      </div>`;
+    }).join("");
+  }
+  render();
+
+  // RF-09: el docente tambien debe poder ver las capacitaciones disponibles
+  // (no asignadas) ademas de las asignadas. Es solo informativo — RF-08
+  // dice que solo el admin puede asignar, el docente no se auto-inscribe.
+  const idsAsignados = new Set(misInscripciones.map(i => i.id_capacitacion));
+  const disponibles = CAPACITACIONES.filter(c => !idsAsignados.has(c.id));
+
+  // RF-08 sigue intacto: "solicitar" nunca crea la inscripcion. Solo deja
+  // una peticion visible para el administrador (patron real de "Request
+  // Approval" de Frontline Professional Growth / MyLearningPlan, usados en
+  // distritos escolares de EEUU) — la inscripcion la crea el admin al aprobar.
+  function etiquetaSolicitud(idCap){
+    const s = solicitudDe(sesion.id, idCap);
+    if(!s) return `<span class="d-tag">No asignada</span>`;
+    if(s.estado === "pendiente") return `<span class="d-tag" style="color:var(--warning);border-color:var(--warning);"><i class="fa-solid fa-hourglass-half"></i> Solicitud enviada</span>`;
+    if(s.estado === "rechazada") return `<span class="d-tag" style="color:#8a2a1e;border-color:#8a2a1e;">No aprobada</span>`;
+    return `<span class="d-tag">No asignada</span>`;
+  }
+
+  function renderDisponibles(){
+    document.getElementById("listaDisponibles").innerHTML = disponibles.map(cap => `
+      <div class="card disponible-card">
+        <div>
+          ${etiquetaSolicitud(cap.id)}
+          <b style="display:block;margin-top:4px;">${cap.titulo}</b>
+          <span style="font-size:12px;color:var(--text-muted);">${cap.fecha} · ${cap.duracion} · ${cap.sede} · ${cap.programa}</span>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="verDisponible(${cap.id})"><i class="fa-solid fa-circle-info"></i> Ver informacion</button>
+      </div>
+    `).join("") || `<p style="font-size:13px;color:var(--text-muted);">Ya tienes todas las capacitaciones disponibles asignadas.</p>`;
+  }
+  renderDisponibles();
+
+  function verDisponible(idCap){
+    const cap = CAPACITACIONES.find(c => c.id === idCap);
+    const s = solicitudDe(sesion.id, idCap);
+    let estadoBox;
+    if(s && s.estado === "pendiente"){
+      estadoBox = `<div class="requisitos-box" style="margin-bottom:1.25rem;"><i class="fa-solid fa-hourglass-half" style="color:var(--warning);"></i> Ya solicitaste esta capacitacion el ${s.fecha_solicitud}. Un administrador la revisara.</div>`;
+    } else if(s && s.estado === "rechazada"){
+      estadoBox = `
+        <div class="requisitos-box" style="margin-bottom:1.25rem;"><i class="fa-solid fa-circle-info" style="color:#8a2a1e;"></i> Tu solicitud no fue aprobada por ahora. Puedes volver a solicitarla.</div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:1rem;">
+          <button class="btn btn-primary btn-sm" onclick="solicitarCapacitacion(${cap.id})"><i class="fa-solid fa-paper-plane"></i> Volver a solicitar</button>
+        </div>
+      `;
+    } else {
+      estadoBox = `
+        <div class="requisitos-box" style="margin-bottom:1.25rem;"><i class="fa-solid fa-triangle-exclamation" style="color:var(--warning);"></i> Aun no te han asignado esta capacitacion.</div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:1rem;">
+          <button class="btn btn-primary btn-sm" onclick="solicitarCapacitacion(${cap.id})"><i class="fa-solid fa-paper-plane"></i> Solicitar esta capacitacion</button>
+        </div>
+      `;
+    }
+    document.getElementById("modalDisponibleBox").innerHTML = `
+      <h3 style="color:var(--navy);margin-bottom:.35rem;">${cap.titulo}</h3>
+      <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:1rem;">${cap.descripcion}</p>
+      <div class="info-side" style="margin-bottom:1rem;">
+        <div class="row"><span>Fecha</span><span>${cap.fecha}</span></div>
+        <div class="row"><span>Duracion</span><span>${cap.duracion}</span></div>
+        <div class="row"><span>Sede</span><span>${cap.sede}</span></div>
+        <div class="row"><span>Instructor</span><span>${cap.instructor || "Por confirmar"}</span></div>
+        <div class="row"><span>Programa</span><span>${cap.programa}</span></div>
+      </div>
+      <h4 style="font-size:12px;text-transform:uppercase;color:var(--text-muted);margin-bottom:.5rem;">Objetivos</h4>
+      <ul class="obj-list" style="margin-bottom:1rem;">
+        ${(cap.objetivos || []).map(o => `<li><i class="fa-solid fa-circle-check"></i> ${o}</li>`).join("") || "<li>No especificado.</li>"}
+      </ul>
+      ${estadoBox}
+      <div style="display:flex;justify-content:flex-end;">
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('modalDisponible').classList.remove('open')"><i class="fa-solid fa-xmark"></i> Cerrar</button>
+      </div>
+    `;
+    document.getElementById("modalDisponible").classList.add("open");
+  }
+
+  function solicitarCapacitacion(idCap){
+    solicitarCapacitacionLocal(sesion.id, idCap);
+    showToast("Solicitud enviada. Un administrador la revisara.", "success");
+    renderDisponibles();
+    verDisponible(idCap);
+  }
+
+  activarFiltrosChip(".chip", "#listaCapacitaciones .card");
+
+  document.getElementById("buscador").addEventListener("input", (e) => {
+    const q = e.target.value.toLowerCase();
+    document.querySelectorAll("#listaCapacitaciones .card").forEach(card => {
+      card.style.display = card.textContent.toLowerCase().includes(q) ? "" : "none";
+    });
+  });
+
+  function verCompletada(idInscripcion){
+    const i = INSCRIPCIONES.find(x => x.id === idInscripcion);
+    const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
+    document.getElementById("modalTexto").textContent = `Completaste "${cap.titulo}". Tu constancia ya esta disponible para descargar.`;
+    document.getElementById("linkDetalleCompletada").href = `detalle.html?id=${i.id}`;
+    document.getElementById("modalCompletada").classList.add("open");
+    if(typeof confetti === "function"){
+      confetti({ particleCount: 110, spread: 75, origin: { y: 0.6 }, colors: ["#00205B","#64a44e","#f0ad4e","#008196"] });
+    }
+  }
+  function cerrarModal(){
+    document.getElementById("modalCompletada").classList.remove("open");
+  }
+
+  // ===== Sugerir tema de capacitacion (MEJORA — needs assessment) =====
+  function renderSugerencias(){
+    const mias = sugerenciasDeDocente(sesion.id).sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
+    document.getElementById("listaSugerencias").innerHTML = mias.length
+      ? `<h4 style="font-size:11px;text-transform:uppercase;color:var(--text-muted);margin-bottom:.5rem;">Tus sugerencias enviadas</h4>` + mias.map(s => `
+          <div class="review-item">
+            <div class="r-head"><span>${s.titulo}</span><span class="badge ${s.estado === "atendida" ? "badge-completada" : "badge-pendiente"}">${s.estado === "atendida" ? "Atendida" : "Pendiente"}</span></div>
+            ${s.detalle ? `<p>${s.detalle}</p>` : ""}
+          </div>
+        `).join("")
+      : "";
+  }
+  renderSugerencias();
+
+  document.getElementById("btnEnviarSugerencia").addEventListener("click", () => {
+    const titulo = document.getElementById("sugTitulo").value.trim();
+    const detalle = document.getElementById("sugDetalle").value.trim();
+    if(!titulo){ showToast("Escribe un tema antes de enviar", "error"); return; }
+    guardarSugerenciaLocal(sesion.id, titulo, detalle);
+    document.getElementById("sugTitulo").value = "";
+    document.getElementById("sugDetalle").value = "";
+    showToast("Sugerencia enviada. Gracias por tu aporte.", "success");
+    renderSugerencias();
+  });
+</script>
 </body>
 </html>

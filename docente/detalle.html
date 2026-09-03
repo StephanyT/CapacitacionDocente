@@ -17,24 +17,226 @@
   <nav class="topnav">
     <div class="topnav-left"><img src="../img/certus_logo.png" alt="CERTUS" class="brand-logo"><span class="brand-divider"></span><span class="brand-label">Panel Docente</span></div>
     <div class="topnav-links">
-      <a href="perfil.html">Perfil</a>
       <a href="mis_capacitaciones.html" class="active">Mis capacitaciones</a>
       <a href="constancias.html">Constancias</a>
       <a href="mi_progreso.html">Mi progreso</a>
       <a href="mentores.html">Mentores</a>
+      <a href="perfil.html">Perfil</a>
     </div>
-    <div class="topnav-right" id="topnavRight">
-      <button class="notif-bell" type="button" aria-label="Notificaciones" title="Notificaciones"><i class="fa-solid fa-bell"></i></button>
-      <button class="topnav-icon-btn" type="button" aria-label="Centro de soporte" title="Centro de soporte"><i class="fa-solid fa-headset"></i></button>
-      <div class="topnav-avatar-wrap">
-        <a href="../login.html" class="topnav-avatar" aria-label="Volver al login" title="Volver al login"><i class="fa-solid fa-user"></i></a>
-      </div>
-    </div>
+    <div class="topnav-right" id="topnavRight"></div>
   </nav>
 
   <main class="main">
-    <!-- Contenido de la pagina: se construye despues. Por ahora solo el navbar. -->
+    <div class="topbar">
+      <h1>Detalle de capacitacion</h1>
+      <a href="mis_capacitaciones.html" class="btn btn-outline btn-sm"><i class="fa-solid fa-arrow-left"></i> Volver</a>
+    </div>
+    <div id="contenido"></div>
   </main>
 </div>
+
+<script src="../js/data.js"></script>
+<script src="../js/app.js"></script>
+<script>
+  const sesion = requireSesion("docente");
+  const idInscripcion = parseInt(new URLSearchParams(window.location.search).get("id"));
+  // BUG real encontrado: antes caia silenciosamente en INSCRIPCIONES[0] si el
+  // id de la URL no existia — eso podia mostrar la capacitacion de OTRO
+  // docente sin ningun aviso. Ahora se exige que la inscripcion sea tuya, y
+  // si no lo es, se redirige en vez de mostrar datos que no te pertenecen.
+  let i = INSCRIPCIONES.find(x => x.id === idInscripcion && x.id_docente === sesion.id);
+  if(!i){
+    i = INSCRIPCIONES.find(x => x.id_docente === sesion.id);
+  }
+  if(!i){
+    // Sin inscripciones todavia (docente recien creado, sin capacitaciones
+    // asignadas aun) — bug real encontrado al vaciar los datos para la demo:
+    // antes esto seguia ejecutando el resto del script sobre un valor
+    // inexistente y se caia con un error. Ahora se redirige y se detiene
+    // aca mismo, sin intentar leer una capacitacion que no existe.
+    window.location.href = "mis_capacitaciones.html";
+    throw new Error("Sin inscripciones — redirigiendo a mis_capacitaciones.html");
+  }
+  const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
+
+  // ===== Reflexion personal por tema (MEJORA, solo v2) =====
+  // Basado en el ciclo de CPD (Continuing Professional Development) que usan
+  // programas de formacion docente en Reino Unido/Europa: Identificar > Planificar
+  // > Actuar > Reflexionar. En vez de un quiz automatico (que no aplica bien a
+  // un sistema de capacitacion docente), el propio docente escribe una nota
+  // breve por tema como evidencia personal de su aprendizaje.
+  // Esto NO toca i.estado en ningun momento: el estado OFICIAL de la
+  // capacitacion sigue siendo actualizado unicamente por el administrador (RF-11).
+  const REFLEX_KEY = `certus_reflexion_${sesion.id}_${cap.id}`;
+  function leerReflexiones(){
+    try{ return JSON.parse(localStorage.getItem(REFLEX_KEY)) || []; }catch(e){ return []; }
+  }
+  function guardarReflexion(idx, valor){
+    const arr = leerReflexiones();
+    arr[idx] = valor;
+    localStorage.setItem(REFLEX_KEY, JSON.stringify(arr));
+    actualizarEstadoTema(idx, valor.trim().length > 0);
+    renderProgresoPersonal();
+  }
+  function actualizarEstadoTema(idx, hecho){
+    const num = document.getElementById(`temnum-${idx}`);
+    if(num){
+      num.classList.toggle("done", hecho);
+      num.innerHTML = hecho ? `<i class="fa-solid fa-check"></i>` : (idx + 1);
+    }
+  }
+  function renderProgresoPersonal(){
+    const arr = leerReflexiones();
+    const total = (cap.temario || []).length || 1;
+    const hechos = (cap.temario || []).filter((_, idx) => arr[idx] && arr[idx].trim().length > 0).length;
+    const pct = Math.round((hechos / total) * 100);
+    const bar = document.getElementById("checkBarFill");
+    const lbl = document.getElementById("checkPct");
+    if(bar){ bar.style.width = pct + "%"; }
+    if(lbl){ lbl.textContent = `${hechos}/${total} temas con reflexion (${pct}%)`; }
+  }
+
+  function toggleAccordion(idx){
+    document.getElementById(`acc-${idx}`).classList.toggle("open");
+  }
+
+  function cambiarTab(tab){
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === `tab-${tab}`));
+  }
+
+  const iniciales = (cap.instructor || "C E").replace(/^(Ing\.|Mg\.|Lic\.|Dr\.|Dra\.)\s*/, "").split(" ").slice(0,2).map(w => w[0]).join("").toUpperCase();
+
+  const reflexionesArr = leerReflexiones();
+
+  document.getElementById("contenido").innerHTML = `
+    <div class="detalle-hero">
+      <div class="detalle-hero-top">
+        <span class="badge ${badgeClase(i.estado)}">${badgeTexto(i.estado)}</span>
+        <span class="semaforo ${semaforoClase(i)}" style="margin:0;" title="Estado de cumplimiento"></span>
+      </div>
+      <h2>${cap.titulo}</h2>
+      <p>${cap.descripcion}</p>
+      <div class="detalle-pills">
+        <span><i class="fa-solid fa-layer-group"></i> ${cap.programa}</span>
+        <span><i class="fa-solid ${esVirtual(cap) ? "fa-laptop" : "fa-location-dot"}"></i> ${cap.sede}</span>
+        <span><i class="fa-solid fa-user-tie"></i> ${cap.instructor || "Por confirmar"}</span>
+      </div>
+      <div class="skill-tags">
+        ${(cap.habilidades || []).map(h => `<span><i class="fa-solid fa-tag"></i> ${h}</span>`).join("")}
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div>
+        <div class="card">
+          <div class="tabs">
+            <button class="tab-btn active" data-tab="resumen" onclick="cambiarTab('resumen')"><i class="fa-solid fa-bullseye"></i> Resumen</button>
+            <button class="tab-btn" data-tab="temario" onclick="cambiarTab('temario')"><i class="fa-solid fa-list-check"></i> Temario</button>
+            <button class="tab-btn" data-tab="instructor" onclick="cambiarTab('instructor')"><i class="fa-solid fa-user-tie"></i> Instructor</button>
+          </div>
+
+          <div class="tab-panel active" id="tab-resumen">
+            <h2 style="margin-bottom:.6rem;"><i class="fa-solid fa-graduation-cap"></i> Lo que aprenderas</h2>
+            <div class="aprenderas-grid">
+              ${(cap.objetivos || []).map(o => `<div class="aprenderas-item"><i class="fa-solid fa-circle-check"></i> ${o}</div>`).join("") || "<p>No especificado.</p>"}
+            </div>
+          </div>
+
+          <div class="tab-panel" id="tab-temario">
+            <div class="checklist-progreso">
+              <div class="bar"><div class="bar-fill" id="checkBarFill" style="width:0%;"></div></div>
+              <b id="checkPct">0/0 temas (0%)</b>
+            </div>
+            <p class="checklist-note"><i class="fa-solid fa-circle-info" style="margin-top:2px;"></i> Escribe una reflexion corta al terminar cada tema: es tu evidencia personal de aprendizaje (como en los sistemas de desarrollo profesional docente). No reemplaza ni modifica el estado oficial de la capacitacion, que solo actualiza el administrador.</p>
+            ${(cap.temario || []).map((t, idx) => `
+              <div class="accordion-item" id="acc-${idx}">
+                <div class="accordion-header" onclick="toggleAccordion(${idx})">
+                  <span class="temario-num${reflexionesArr[idx] && reflexionesArr[idx].trim() ? " done" : ""}" id="temnum-${idx}" style="width:20px;height:20px;font-size:10px;">${reflexionesArr[idx] && reflexionesArr[idx].trim() ? `<i class="fa-solid fa-check"></i>` : idx + 1}</span>
+                  ${t}
+                  <i class="fa-solid fa-chevron-down chev"></i>
+                </div>
+                <div class="accordion-body">
+                  <div class="accordion-body-inner">
+                    <label class="reflexion-label"><i class="fa-solid fa-pen"></i> Tu reflexion (opcional): ¿como aplicarias esto en tu clase?</label>
+                    <textarea class="reflexion-input" rows="2" placeholder="Escribe una breve nota..." oninput="guardarReflexion(${idx}, this.value)">${reflexionesArr[idx] || ""}</textarea>
+                    <span class="reflexion-hint"><i class="fa-solid fa-lock"></i> Se guarda solo en tu navegador; es evidencia personal, no reemplaza el estado oficial.</span>
+                  </div>
+                </div>
+              </div>
+            `).join("") || "<p>No especificado.</p>"}
+          </div>
+
+          <div class="tab-panel" id="tab-instructor">
+            <div class="instructor-card">
+              <div class="instructor-avatar">${iniciales}</div>
+              <div>
+                <h3>${cap.instructor || "Por confirmar"}</h3>
+                <span class="rol">Instructor(a) · ${cap.programa}</span>
+                <p>${cap.instructor_bio || "Informacion del instructor no disponible por el momento."}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="sticky-side">
+          <div class="card info-side">
+            <h2><i class="fa-solid fa-circle-info"></i> Informacion general</h2>
+            <div class="row"><span>Fecha</span><span>${cap.fecha}</span></div>
+            <div class="row"><span>Duracion</span><span>${cap.duracion}</span></div>
+            <div class="row"><span>Sede</span><span>${cap.sede}</span></div>
+            <div class="row"><span>Instructor</span><span>${cap.instructor || "Por confirmar"}</span></div>
+            <div class="row"><span>Programa</span><span>${cap.programa}</span></div>
+            <div class="row"><span>Fecha limite</span><span>${i.fecha_limite}</span></div>
+            <h2 style="margin-top:1.1rem;"><i class="fa-solid fa-clipboard-check"></i> Requisitos</h2>
+            <div class="requisitos-box"><i class="fa-solid fa-triangle-exclamation" style="color:var(--warning);"></i> ${cap.requisitos || "Ninguno."}</div>
+          </div>
+
+          ${i.estado === "completada" ? `
+            <div class="card" style="text-align:center;">
+              <i class="fa-solid fa-award" style="font-size:26px;color:var(--secondary);margin-bottom:.5rem;display:block;"></i>
+              <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:.75rem;">Completaste esta capacitacion. Tu constancia ya esta disponible.</p>
+              <a href="constancias.html" class="btn btn-primary btn-sm" style="width:100%;justify-content:center;"><i class="fa-solid fa-certificate"></i> Ver mi constancia</a>
+            </div>
+          ` : `
+            <div class="card" style="font-size:12px;color:var(--text-muted);background:var(--bg);">
+              <i class="fa-solid fa-shield-halved"></i> El estado de esta capacitacion lo actualiza el administrador. Cuando la marque como
+              <b style="color:var(--text);">completada</b>, tu constancia se generara automaticamente y aparecera en "Constancias".
+            </div>
+          `}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><i class="fa-solid fa-shapes"></i> Capacitaciones relacionadas</h2>
+      <div class="related-grid" id="relacionadas"></div>
+    </div>
+  `;
+
+  renderProgresoPersonal();
+
+  // ===== Capacitaciones relacionadas (MEJORA, solo v2) =====
+  // Mismo programa, excluyendo la actual. Si el docente ya tiene una
+  // inscripcion propia, navega a su detalle; si no, solo informa (no permite
+  // autoinscribirse, segun RF-08).
+  const relacionadas = CAPACITACIONES.filter(c => c.programa === cap.programa && c.id !== cap.id).slice(0, 3);
+  document.getElementById("relacionadas").innerHTML = relacionadas.length ? relacionadas.map(c => {
+    const miInscripcion = INSCRIPCIONES.find(x => x.id_docente === sesion.id && x.id_capacitacion === c.id);
+    const accion = miInscripcion
+      ? `onclick="window.location.href='detalle.html?id=${miInscripcion.id}'"`
+      : `onclick="showToast('Aun no tienes esta capacitacion asignada. Consulta con tu administrador.', 'info')"`;
+    return `
+      <div class="related-card" ${accion}>
+        <span class="r-tag">${miInscripcion ? badgeTexto(miInscripcion.estado) : "No asignada"}</span>
+        <h4>${c.titulo}</h4>
+        <span class="meta"><i class="fa-solid fa-clock"></i> ${c.duracion}</span>
+        <span class="meta"><i class="fa-solid ${esVirtual(c) ? "fa-laptop" : "fa-location-dot"}"></i> ${c.sede}</span>
+      </div>
+    `;
+  }).join("") : `<p style="font-size:12.5px;color:var(--text-muted);">No hay otras capacitaciones en este programa por el momento.</p>`;
+</script>
 </body>
 </html>

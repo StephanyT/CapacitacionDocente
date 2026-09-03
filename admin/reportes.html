@@ -24,18 +24,193 @@
       <a href="reportes.html" class="active">Reportes</a>
       <a href="mentores.html">Mentores</a>
     </div>
-    <div class="topnav-right" id="topnavRight">
-      <button class="notif-bell" type="button" aria-label="Notificaciones" title="Notificaciones"><i class="fa-solid fa-bell"></i></button>
-      <button class="topnav-icon-btn" type="button" aria-label="Centro de soporte" title="Centro de soporte"><i class="fa-solid fa-headset"></i></button>
-      <div class="topnav-avatar-wrap">
-        <a href="../login.html" class="topnav-avatar" aria-label="Volver al login" title="Volver al login"><i class="fa-solid fa-user"></i></a>
-      </div>
-    </div>
+    <div class="topnav-right" id="topnavRight"></div>
   </nav>
 
   <main class="main">
-    <!-- Contenido de la pagina: se construye despues. Por ahora solo el navbar. -->
+    <div class="topbar">
+      <h1>Reportes</h1>
+      <button class="btn btn-outline" id="btnExportarReporte"><i class="fa-solid fa-file-export"></i> Exportar CSV</button>
+    </div>
+
+    <div class="card">
+      <div class="grid-4">
+        <div class="form-group"><label>Sede</label>
+          <select id="fSede"><option value="todas">Todas</option><option>Lima Centro</option><option>Lima Norte</option><option>Arequipa</option><option>Aula Virtual</option></select>
+        </div>
+        <div class="form-group"><label>Programa</label>
+          <select id="fPrograma"><option value="todas">Todos</option><option>Diseno y Desarrollo de Software</option><option>Administracion</option><option>Marketing</option><option>Idiomas</option><option>Psicologia</option></select>
+        </div>
+        <div class="form-group"><label>Docente</label>
+          <select id="fDocente"><option value="todas">Todos</option></select>
+        </div>
+        <div class="form-group"><label>Estado</label>
+          <select id="fEstado"><option value="todas">Todos</option><option>pendiente</option><option>en curso</option><option>completada</option></select>
+        </div>
+      </div>
+      <div class="grid-4" style="margin-top:.25rem;">
+        <div class="form-group"><label><i class="fa-solid fa-calendar-day"></i> Periodo desde</label>
+          <input type="date" id="fDesde">
+        </div>
+        <div class="form-group"><label><i class="fa-solid fa-calendar-day"></i> Periodo hasta</label>
+          <input type="date" id="fHasta">
+        </div>
+        <div class="form-group" style="display:flex;align-items:flex-end;">
+          <button class="btn btn-outline btn-sm" onclick="limpiarPeriodo()" style="width:100%;"><i class="fa-solid fa-rotate-left"></i> Limpiar periodo</button>
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <thead><tr><th></th><th>Docente</th><th>Capacitacion</th><th>Sede</th><th>Programa</th><th>Estado</th><th>Fecha de inicio</th><th>Fecha limite</th><th>Fecha de finalizacion</th></tr></thead>
+      <tbody id="tablaReporte"></tbody>
+    </table>
+    <nav aria-label="Paginacion de reportes" style="margin-top:1rem;">
+      <ul class="pager" id="paginacionReportes"></ul>
+    </nav>
   </main>
 </div>
+
+<script src="../js/data.js"></script>
+<script src="../js/app.js"></script>
+<script>
+  requireSesion("admin");
+
+  document.getElementById("fDocente").innerHTML += DOCENTES.map(d => `<option value="${d.id}">${d.nombres} ${d.apellidos}</option>`).join("");
+
+  let filasActuales = [];
+
+  // Paginacion — solo pagina lo que se ve en pantalla;
+  // filasActuales sigue teniendo TODAS las filas filtradas (sin recortar),
+  // porque exportarCSV() debe exportar el filtro completo, no solo la pagina visible.
+  const REPORTE_POR_PAGINA = 8;
+  let paginaActualReportes = 1;
+
+  function cambiarPaginaReportes(pagina){
+    paginaActualReportes = pagina;
+    renderTablaReporte();
+    window.scrollTo({top: 0, behavior: "smooth"});
+  }
+
+  function renderPaginacionReportes(totalPaginas){
+    const cont = document.getElementById("paginacionReportes");
+    if(!cont) return;
+    if(totalPaginas <= 1){ cont.innerHTML = ""; return; }
+    let html = `<li class="pager-item ${paginaActualReportes === 1 ? "disabled" : ""}">
+      <a class="pager-link" href="#" onclick="event.preventDefault();cambiarPaginaReportes(${paginaActualReportes - 1})">Anterior</a>
+    </li>`;
+    for(let p = 1; p <= totalPaginas; p++){
+      html += `<li class="pager-item ${p === paginaActualReportes ? "active" : ""}">
+        <a class="pager-link" href="#" onclick="event.preventDefault();cambiarPaginaReportes(${p})">${p}</a>
+      </li>`;
+    }
+    html += `<li class="pager-item ${paginaActualReportes === totalPaginas ? "disabled" : ""}">
+      <a class="pager-link" href="#" onclick="event.preventDefault();cambiarPaginaReportes(${paginaActualReportes + 1})">Siguiente</a>
+    </li>`;
+    cont.innerHTML = html;
+  }
+
+  function renderTablaReporte(){
+    const totalPaginas = Math.max(1, Math.ceil(filasActuales.length / REPORTE_POR_PAGINA));
+    if(paginaActualReportes > totalPaginas) paginaActualReportes = totalPaginas;
+    const inicio = (paginaActualReportes - 1) * REPORTE_POR_PAGINA;
+    const filas = filasActuales.slice(inicio, inicio + REPORTE_POR_PAGINA);
+
+    document.getElementById("tablaReporte").innerHTML = filas.map(i => {
+      const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
+      const fechaFin = i.estado === "completada" ? (i.fecha_actualizacion || i.fecha_limite) : "-";
+      return `<tr>
+        <td><span class="semaforo ${semaforoClase(i)}" title="${semaforoTexto(i)}"></span></td>
+        <td><a href="gestion_docentes.html?docente=${i.id_docente}" style="color:var(--info);">${nombreDocente(i.id_docente)}</a></td>
+        <td>${cap.titulo}</td>
+        <td>${cap.sede}</td>
+        <td>${cap.programa}</td>
+        <td><span class="badge ${badgeClase(i.estado)}">${badgeTexto(i.estado)}</span></td>
+        <td>${i.fecha_inscripcion || "-"}</td>
+        <td>${i.fecha_limite || "-"}</td>
+        <td>${fechaFin}</td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="9" style="text-align:center;color:#6a737b;">Sin resultados</td></tr>`;
+
+    renderPaginacionReportes(totalPaginas);
+  }
+
+  function render(){
+    const sede = document.getElementById("fSede").value;
+    const programa = document.getElementById("fPrograma").value;
+    const docente = document.getElementById("fDocente").value;
+    const estado = document.getElementById("fEstado").value;
+    const desde = document.getElementById("fDesde").value;
+    const hasta = document.getElementById("fHasta").value;
+
+    const filas = INSCRIPCIONES.filter(i => {
+      const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
+      if(sede !== "todas" && cap.sede !== sede) return false;
+      if(programa !== "todas" && cap.programa !== programa) return false;
+      if(docente !== "todas" && i.id_docente !== parseInt(docente)) return false;
+      if(estado !== "todas" && i.estado !== estado) return false;
+      // RF-17: filtro por periodo, sobre la columna "Fecha de finalizacion".
+      // Esa columna solo tiene un valor real quando la inscripcion esta
+      // completada (fecha_actualizacion); en pendiente/en curso se muestra
+      // "-" porque aun no hay fecha de finalizacion. Por eso, si el filtro
+      // de periodo esta activo, esas filas sin fecha real quedan fuera —
+      // antes se colaban usando fecha_limite como reemplazo, lo cual no
+      // coincidia con lo que se veia en pantalla.
+      if(desde || hasta){
+        if(i.estado !== "completada") return false;
+        const fechaFinalizacion = i.fecha_actualizacion || i.fecha_limite;
+        if(desde && fechaFinalizacion < desde) return false;
+        if(hasta && fechaFinalizacion > hasta) return false;
+      }
+      return true;
+    });
+
+    // Columna de semaforo + las 3 fechas del ciclo de vida (RF-17/RF-18): antes
+    // el reporte solo mostraba limite y finalizacion, saltandose el inicio —
+    // sin la fecha de inscripcion no se podia leer el recorrido completo
+    // (inicio -> limite -> finalizacion) de un vistazo. Tampoco tenia ninguna
+    // senial de urgencia, aunque el semaforo ya existe en Dashboard y en el
+    // perfil del docente.
+    filasActuales = filas;
+    paginaActualReportes = 1;
+    renderTablaReporte();
+  }
+  render();
+  ["fSede","fPrograma","fDocente","fEstado","fDesde","fHasta"].forEach(id => document.getElementById(id).addEventListener("change", render));
+
+  function limpiarPeriodo(){
+    document.getElementById("fDesde").value = "";
+    document.getElementById("fHasta").value = "";
+    render();
+  }
+
+  // RF-18: exportacion real del reporte filtrado (no simulada) — genera un
+  // CSV en el navegador con exactamente las filas visibles en la tabla.
+  function exportarCSV(){
+    if(filasActuales.length === 0){
+      showToast("No hay filas para exportar con estos filtros", "error");
+      return;
+    }
+    const encabezado = ["Docente","Capacitacion","Sede","Programa","Estado","Cumplimiento","Fecha de inicio","Fecha limite","Fecha de finalizacion"];
+    const filasCSV = filasActuales.map(i => {
+      const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
+      const fechaFin = i.estado === "completada" ? (i.fecha_actualizacion || i.fecha_limite) : "-";
+      return [nombreDocente(i.id_docente), cap.titulo, cap.sede, cap.programa, badgeTexto(i.estado), semaforoTexto(i), i.fecha_inscripcion || "-", i.fecha_limite || "-", fechaFin];
+    });
+    const escapar = (v) => `"${String(v).replace(/"/g, '""')}"`;
+    const csv = [encabezado, ...filasCSV].map(fila => fila.map(escapar).join(",")).join("\r\n");
+    const blob = new Blob(["﻿" + csv], {type: "text/csv;charset=utf-8;"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `reporte-certus-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast(`Reporte exportado (${filasActuales.length} filas)`, "success");
+  }
+  document.getElementById("btnExportarReporte").addEventListener("click", exportarCSV);
+</script>
 </body>
 </html>

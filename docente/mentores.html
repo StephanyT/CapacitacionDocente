@@ -17,24 +17,242 @@
   <nav class="topnav">
     <div class="topnav-left"><img src="../img/certus_logo.png" alt="CERTUS" class="brand-logo"><span class="brand-divider"></span><span class="brand-label">Panel Docente</span></div>
     <div class="topnav-links">
-      <a href="perfil.html">Perfil</a>
       <a href="mis_capacitaciones.html">Mis capacitaciones</a>
       <a href="constancias.html">Constancias</a>
       <a href="mi_progreso.html">Mi progreso</a>
       <a href="mentores.html" class="active">Mentores</a>
+      <a href="perfil.html">Perfil</a>
     </div>
-    <div class="topnav-right" id="topnavRight">
-      <button class="notif-bell" type="button" aria-label="Notificaciones" title="Notificaciones"><i class="fa-solid fa-bell"></i></button>
-      <button class="topnav-icon-btn" type="button" aria-label="Centro de soporte" title="Centro de soporte"><i class="fa-solid fa-headset"></i></button>
-      <div class="topnav-avatar-wrap">
-        <a href="../login.html" class="topnav-avatar" aria-label="Volver al login" title="Volver al login"><i class="fa-solid fa-user"></i></a>
-      </div>
-    </div>
+    <div class="topnav-right" id="topnavRight"></div>
   </nav>
 
   <main class="main">
-    <!-- Contenido de la pagina: se construye despues. Por ahora solo el navbar. -->
+    <div class="topbar">
+      <h1>Red de mentoria</h1>
+      <span style="font-size:11px;background:#fdeedd;color:#8a5a1a;padding:4px 10px;border-radius:20px;">Extension</span>
+    </div>
+
+    <p style="font-size:12.5px;color:var(--text-muted);margin:-.75rem 0 1rem;"><i class="fa-solid fa-circle-info"></i> Haz clic en un mentor para ver su perfil completo y elegir un horario disponible.</p>
+    <div class="card" id="cardMentorRecomendado" style="display:none;background:linear-gradient(120deg,rgba(0,32,91,.05),rgba(0,129,150,.06));border:1px solid rgba(0,129,150,.25);"></div>
+    <div id="listaMentores" class="stagger"></div>
+
+    <div class="card" id="cardMisSesiones" style="margin-top:1rem;display:none;">
+      <h2><i class="fa-solid fa-calendar-check"></i> Mis sesiones de mentoria</h2>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:.75rem;">Cada sesion queda ligada a una meta concreta, para aprovecharla mejor.</p>
+      <div id="listaMisSesiones"></div>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+      <h2>Autoevaluacion guiada</h2>
+      <p style="font-size:13px;color:#6a737b;margin-bottom:.75rem;">Reflexiona sobre una clase reciente con ayuda de un video.</p>
+      <a href="autoevaluacion.html" class="btn btn-outline btn-sm">Ir a autoevaluacion</a>
+    </div>
   </main>
 </div>
+
+<div class="modal-overlay" id="modalMentor">
+  <div class="modal-box wide" id="modalMentorBox"></div>
+</div>
+
+<div class="modal-overlay" id="modalReview">
+  <div class="modal-box" style="width:400px;text-align:left;">
+    <h3 style="color:var(--navy);margin-bottom:.35rem;"><i class="fa-solid fa-comment-dots"></i> Deja tu reseña</h3>
+    <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:1rem;" id="reviewMentorNombre"></p>
+    <div class="form-group">
+      <label>Tu calificacion</label>
+      <div id="starPicker" class="star-picker"></div>
+    </div>
+    <div class="form-group">
+      <label>Comentario</label>
+      <textarea id="reviewTexto" rows="3" placeholder="¿Como te ayudo esta sesion?" style="width:100%;padding:9px 11px;border:1px solid var(--secondary);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;background:var(--surface);color:var(--text);"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-outline btn-sm" id="reviewCancelar" type="button"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+      <button class="btn btn-primary btn-sm" id="reviewEnviar" type="button"><i class="fa-solid fa-paper-plane"></i> Enviar reseña</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/data.js"></script>
+<script src="../js/app.js"></script>
+<script>
+  const sesion = requireSesion("docente");
+  let slotSeleccionado = null;
+
+  function iniciales(nombres){ return nombres.split(" ").map(w=>w[0]).join("").slice(0,2); }
+  function estrellas(rating){
+    const llenas = Math.round(rating);
+    return Array.from({length:5}, (_,i) => `<i class="fa-${i < llenas ? "solid" : "regular"} fa-star"></i>`).join("");
+  }
+
+  document.getElementById("listaMentores").innerHTML = MENTORES.map(m => `
+    <div class="card mentor-card" onclick="abrirMentor(${m.id})">
+      <div style="display:flex;align-items:center;">
+        <div class="avatar">${iniciales(m.nombres)}</div>
+        <div class="info">
+          <b>${m.nombres}</b>
+          <span>${m.tema} · ${m.sesiones} sesiones · <i class="fa-solid fa-star" style="color:var(--warning);"></i> ${m.rating}</span>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();abrirMentor(${m.id})"><i class="fa-solid fa-calendar-check"></i> Ver perfil</button>
+    </div>
+  `).join("");
+
+  function abrirMentor(id){
+    const m = MENTORES.find(x => x.id === id);
+    slotSeleccionado = null;
+    document.getElementById("modalMentorBox").innerHTML = `
+      <div class="mentor-modal-head">
+        <div class="avatar-lg">${iniciales(m.nombres)}</div>
+        <div>
+          <h3>${m.nombres}</h3>
+          <span>${m.tema}</span><br>
+          <span style="color:var(--warning);">${estrellas(m.rating)}</span> <span>${m.rating} · ${m.sesiones} sesiones</span>
+        </div>
+      </div>
+      <div class="mentor-stats-row">
+        <div><b>${m.anios_experiencia}</b><span>Anos de experiencia</span></div>
+        <div><b>${m.sesiones}</b><span>Sesiones dadas</span></div>
+        <div><b>${m.rating}</b><span>Rating promedio</span></div>
+      </div>
+      <p class="mentor-bio">${m.bio}</p>
+
+      <div class="mentor-modal-section">
+        <h4><i class="fa-solid fa-calendar-days"></i> Horarios disponibles</h4>
+        <div class="slot-grid" id="slotsMentor">
+          ${m.disponibilidad.map(s => `<span class="slot-chip" onclick="seleccionarSlot(this,'${s}')">${s}</span>`).join("")}
+        </div>
+      </div>
+
+      <div class="mentor-modal-section">
+        <h4><i class="fa-solid fa-bullseye"></i> ¿Que buscas lograr en esta sesion?</h4>
+        <p style="font-size:11.5px;color:var(--text-muted);margin-bottom:.5rem;">Define una meta concreta: ayuda al mentor a enfocar la sesion (patron usado en coaching docente real).</p>
+        <textarea id="metaSesion" rows="2" placeholder="Ej: Mejorar mis rubricas de evaluacion de proyectos finales." style="width:100%;padding:9px 11px;border:1px solid var(--secondary);border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;background:var(--surface);color:var(--text);"></textarea>
+      </div>
+
+      <div class="mentor-modal-section">
+        <h4><i class="fa-solid fa-comment"></i> Opiniones de otros docentes</h4>
+        ${reviewsDeMentor(m.id).map(r => `
+          <div class="review-item">
+            <div class="r-head"><span>${r.autor}</span><span class="r-stars">${estrellas(r.rating)}</span></div>
+            <p>${r.comentario}</p>
+          </div>
+        `).join("") || `<p style="font-size:12.5px;color:var(--text-muted);">Aun no tiene opiniones.</p>`}
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:1.25rem;">
+        <button class="btn btn-outline btn-sm" onclick="cerrarMentor()">Cancelar</button>
+        <button class="btn btn-primary btn-sm" onclick="confirmarAgenda(${m.id}, '${m.nombres.replace(/'/g,"")}')"><i class="fa-solid fa-calendar-check"></i> Confirmar sesion</button>
+      </div>
+    `;
+    document.getElementById("modalMentor").classList.add("open");
+  }
+
+  function seleccionarSlot(el, slot){
+    document.querySelectorAll("#slotsMentor .slot-chip").forEach(c => c.classList.remove("selected"));
+    el.classList.add("selected");
+    slotSeleccionado = slot;
+  }
+
+  function cerrarMentor(){
+    document.getElementById("modalMentor").classList.remove("open");
+  }
+
+  function confirmarAgenda(idMentor, nombreMentor){
+    if(!slotSeleccionado){
+      showToast("Elige un horario disponible antes de confirmar", "error");
+      return;
+    }
+    const meta = (document.getElementById("metaSesion").value || "").trim();
+    if(!meta){
+      showToast("Escribe que buscas lograr en la sesion antes de confirmar", "error");
+      return;
+    }
+    guardarSesionLocal(sesion.id, {
+      id: Date.now(), id_docente: sesion.id, id_mentor: idMentor, slot: slotSeleccionado,
+      meta, estado: "agendada", fecha_creacion: new Date().toISOString().slice(0,10)
+    });
+    showToast(`Sesion con ${nombreMentor} agendada para ${slotSeleccionado}`, "success");
+    cerrarMentor();
+    renderMisSesiones();
+  }
+
+  function renderMisSesiones(){
+    const mias = sesionesDeDocente(sesion.id).sort((a,b) => new Date(b.fecha_creacion) - new Date(a.fecha_creacion));
+    const card = document.getElementById("cardMisSesiones");
+    if(mias.length === 0){ card.style.display = "none"; return; }
+    card.style.display = "block";
+    document.getElementById("listaMisSesiones").innerHTML = mias.map(s => {
+      const m = MENTORES.find(x => x.id === s.id_mentor);
+      const puedeResenar = s.estado === "completada" && !s.reseniaEnviada;
+      return `
+        <div class="sesion-item">
+          <div class="s-info">
+            <b>${m ? m.nombres : "Mentor"}</b>
+            <span>${s.slot} · <span class="badge ${s.estado === "completada" ? "badge-completada" : "badge-curso"}">${s.estado === "completada" ? "Completada" : "Agendada"}</span></span>
+            <span class="s-meta"><i class="fa-solid fa-bullseye"></i> ${s.meta}</span>
+          </div>
+          ${puedeResenar ? `<button class="btn btn-outline btn-sm" onclick="abrirReview(${s.id}, ${s.id_mentor})"><i class="fa-solid fa-star"></i> Dejar reseña</button>` : ""}
+          ${s.estado === "completada" && s.reseniaEnviada ? `<span style="font-size:11px;color:var(--success);"><i class="fa-solid fa-circle-check"></i> Reseña enviada</span>` : ""}
+        </div>
+      `;
+    }).join("");
+  }
+  renderMisSesiones();
+
+  // ===== Dejar resenia sobre un mentor (MEJORA) =====
+  let sesionEnRevision = null;
+  let ratingSeleccionado = 0;
+
+  function renderStarPicker(){
+    const picker = document.getElementById("starPicker");
+    picker.innerHTML = Array.from({length:5}, (_, i) => `<i class="fa-${i < ratingSeleccionado ? "solid" : "regular"} fa-star" data-val="${i+1}" onclick="elegirRating(${i+1})"></i>`).join("");
+  }
+  function elegirRating(val){
+    ratingSeleccionado = val;
+    renderStarPicker();
+  }
+
+  function abrirReview(idSesion, idMentor){
+    sesionEnRevision = {idSesion, idMentor};
+    ratingSeleccionado = 0;
+    const m = MENTORES.find(x => x.id === idMentor);
+    document.getElementById("reviewMentorNombre").textContent = `Sobre tu sesion con ${m ? m.nombres : "el mentor"}`;
+    document.getElementById("reviewTexto").value = "";
+    renderStarPicker();
+    document.getElementById("modalReview").classList.add("open");
+  }
+  document.getElementById("reviewCancelar").addEventListener("click", () => {
+    document.getElementById("modalReview").classList.remove("open");
+  });
+  document.getElementById("reviewEnviar").addEventListener("click", () => {
+    if(ratingSeleccionado === 0){ showToast("Elige una calificacion antes de enviar", "error"); return; }
+    const texto = document.getElementById("reviewTexto").value.trim();
+    if(!texto){ showToast("Escribe un breve comentario", "error"); return; }
+    guardarReviewLocal(sesionEnRevision.idMentor, sesion.nombre, texto, ratingSeleccionado);
+    marcarSesionResenada(sesion.id, sesionEnRevision.idSesion);
+    document.getElementById("modalReview").classList.remove("open");
+    showToast("Gracias por tu reseña", "success");
+    renderMisSesiones();
+  });
+
+  // Mentor recomendado para docentes con poca experiencia (MEJORA — induccion)
+  const recomendado = mentorRecomendado(sesion.id);
+  if(recomendado){
+    document.getElementById("cardMentorRecomendado").style.display = "block";
+    document.getElementById("cardMentorRecomendado").innerHTML = `
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <div class="avatar">${iniciales(recomendado.nombres)}</div>
+        <div style="flex:1;min-width:200px;">
+          <span style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--info);"><i class="fa-solid fa-hand-holding-heart"></i> Mentor recomendado para ti</span>
+          <b style="display:block;font-size:14px;margin-top:2px;">${recomendado.nombres}</b>
+          <span style="font-size:12px;color:var(--text-muted);">${recomendado.tema} · <i class="fa-solid fa-star" style="color:var(--warning);"></i> ${recomendado.rating}</span>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="abrirMentor(${recomendado.id})"><i class="fa-solid fa-calendar-check"></i> Ver perfil</button>
+      </div>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:.6rem;"><i class="fa-solid fa-circle-info"></i> Te lo sugerimos porque recien te estas incorporando — puedes elegir a otro mentor si prefieres.</p>
+    `;
+  }
+</script>
 </body>
 </html>

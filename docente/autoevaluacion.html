@@ -17,24 +17,136 @@
   <nav class="topnav">
     <div class="topnav-left"><img src="../img/certus_logo.png" alt="CERTUS" class="brand-logo"><span class="brand-divider"></span><span class="brand-label">Panel Docente</span></div>
     <div class="topnav-links">
-      <a href="perfil.html">Perfil</a>
       <a href="mis_capacitaciones.html">Mis capacitaciones</a>
       <a href="constancias.html">Constancias</a>
       <a href="mi_progreso.html">Mi progreso</a>
       <a href="mentores.html" class="active">Mentores</a>
+      <a href="perfil.html">Perfil</a>
     </div>
-    <div class="topnav-right" id="topnavRight">
-      <button class="notif-bell" type="button" aria-label="Notificaciones" title="Notificaciones"><i class="fa-solid fa-bell"></i></button>
-      <button class="topnav-icon-btn" type="button" aria-label="Centro de soporte" title="Centro de soporte"><i class="fa-solid fa-headset"></i></button>
-      <div class="topnav-avatar-wrap">
-        <a href="../login.html" class="topnav-avatar" aria-label="Volver al login" title="Volver al login"><i class="fa-solid fa-user"></i></a>
-      </div>
-    </div>
+    <div class="topnav-right" id="topnavRight"></div>
   </nav>
 
   <main class="main">
-    <!-- Contenido de la pagina: se construye despues. Por ahora solo el navbar. -->
+    <div class="topbar">
+      <h1>Autoevaluacion con video</h1>
+      <span style="font-size:11px;background:#fdeedd;color:#8a5a1a;padding:4px 10px;border-radius:20px;">Extension</span>
+    </div>
+    <p style="font-size:12.5px;color:var(--text-muted);margin:-.75rem 0 1rem;"><i class="fa-solid fa-circle-info"></i> Reflexiona sobre una clase de una capacitacion que ya completaste. Coaches y colegas pueden comentar tu reflexion (estilo coaching colaborativo).</p>
+
+    <div class="card">
+      <div class="form-group">
+        <label>¿Sobre que capacitacion es esta autoevaluacion?</label>
+        <select id="selectCap"></select>
+      </div>
+      <div class="form-group">
+        <label>Enlace del video de tu clase (YouTube o Drive)</label>
+        <input type="text" id="linkVideo" placeholder="https://...">
+      </div>
+      <div id="previewVideo"></div>
+
+      <h2 style="margin-top:1rem;">Checklist de autorreflexion</h2>
+      <label style="display:block;font-size:13px;margin:8px 0;"><input type="checkbox" id="chk0"> Gestione bien el tiempo de la clase</label>
+      <label style="display:block;font-size:13px;margin:8px 0;"><input type="checkbox" id="chk1"> Logre la participacion de los estudiantes</label>
+      <label style="display:block;font-size:13px;margin:8px 0;"><input type="checkbox" id="chk2"> Explique los conceptos con claridad</label>
+
+      <div class="form-group" style="margin-top:1rem;">
+        <label>Tu reflexion (opcional)</label>
+        <textarea id="notaPropia" rows="3" placeholder="¿Que harias distinto la proxima vez?"></textarea>
+      </div>
+
+      <button class="btn btn-primary" id="btnGuardarAutoeval"><i class="fa-solid fa-floppy-disk"></i> Guardar autoevaluacion</button>
+      <div id="tipCoaching" style="display:none;"></div>
+    </div>
+
+    <div class="card" id="cardHistorial" style="display:none;">
+      <h2><i class="fa-solid fa-clock-rotate-left"></i> Tus autoevaluaciones</h2>
+      <div id="listaAutoeval"></div>
+    </div>
   </main>
 </div>
+
+<script src="../js/data.js"></script>
+<script src="../js/app.js"></script>
+<script>
+  const sesion = requireSesion("docente");
+  const misCompletadas = INSCRIPCIONES.filter(i => i.id_docente === sesion.id && i.estado === "completada");
+
+  document.getElementById("selectCap").innerHTML = misCompletadas.length
+    ? misCompletadas.map(i => {
+        const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
+        return `<option value="${cap.id}">${cap.titulo}</option>`;
+      }).join("")
+    : `<option value="">Aun no completas ninguna capacitacion</option>`;
+
+  document.getElementById("linkVideo").addEventListener("change", (e) => {
+    document.getElementById("previewVideo").innerHTML =
+      `<p style="font-size:12px;color:#6a737b;margin:.5rem 0;">Video cargado: ${e.target.value}</p>`;
+  });
+
+  function renderHistorial(){
+    const mias = autoevaluacionesDeDocente(sesion.id).sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
+    const card = document.getElementById("cardHistorial");
+    if(mias.length === 0){ card.style.display = "none"; return; }
+    card.style.display = "block";
+    document.getElementById("listaAutoeval").innerHTML = mias.map(a => {
+      const cap = CAPACITACIONES.find(c => c.id === a.id_capacitacion);
+      const hechos = (a.checklist || []).filter(Boolean).length;
+      return `
+        <div class="autoeval-item">
+          <div class="ae-head">
+            <b>${cap ? cap.titulo : "Capacitacion"}</b>
+            <span>${a.fecha} · ${hechos}/3 items marcados</span>
+          </div>
+          ${a.notaPropia ? `<p class="ae-nota"><i class="fa-solid fa-pen"></i> ${a.notaPropia}</p>` : ""}
+          ${(a.comentarios && a.comentarios.length) ? `
+            <div class="ae-comentarios">
+              ${a.comentarios.map(c => `
+                <div class="review-item">
+                  <div class="r-head"><span>${c.autor}</span><span style="font-size:11px;color:var(--text-muted);">${c.fecha}</span></div>
+                  <p>${c.texto}</p>
+                </div>
+              `).join("")}
+            </div>
+          ` : `<p style="font-size:11.5px;color:var(--text-muted);"><i class="fa-solid fa-hourglass-half"></i> Aun sin comentarios de mentores o colegas.</p>`}
+        </div>
+      `;
+    }).join("");
+  }
+  renderHistorial();
+
+  document.getElementById("btnGuardarAutoeval").addEventListener("click", () => {
+    const idCap = parseInt(document.getElementById("selectCap").value);
+    if(!idCap){ showToast("Elige una capacitacion antes de guardar", "error"); return; }
+    const cap = CAPACITACIONES.find(c => c.id === idCap);
+    const checklist = [
+      document.getElementById("chk0").checked,
+      document.getElementById("chk1").checked,
+      document.getElementById("chk2").checked
+    ];
+    const notaPropia = document.getElementById("notaPropia").value.trim();
+    const videoLink = document.getElementById("linkVideo").value.trim();
+
+    guardarAutoevalLocal(sesion.id, {
+      id: Date.now(), id_docente: sesion.id, id_capacitacion: idCap,
+      video_link: videoLink, checklist, notaPropia,
+      fecha: new Date().toISOString().slice(0,10), comentarios: []
+    });
+
+    showToast("Autoevaluacion guardada", "success");
+    renderHistorial();
+
+    const tip = document.getElementById("tipCoaching");
+    tip.style.display = "block";
+    tip.innerHTML = `
+      <div class="tip-coaching">
+        <i class="fa-solid fa-lightbulb"></i>
+        <div>
+          <b>Sugerencia automatica</b> — <span style="font-size:11px;color:var(--text-muted);">(no es un analisis de IA real, es un tip general segun tu programa)</span>
+          <p>${sugerenciaCoaching(cap.programa)}</p>
+        </div>
+      </div>
+    `;
+  });
+</script>
 </body>
 </html>

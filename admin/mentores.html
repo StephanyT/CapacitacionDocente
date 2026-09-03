@@ -24,18 +24,188 @@
       <a href="reportes.html">Reportes</a>
       <a href="mentores.html" class="active">Mentores</a>
     </div>
-    <div class="topnav-right" id="topnavRight">
-      <button class="notif-bell" type="button" aria-label="Notificaciones" title="Notificaciones"><i class="fa-solid fa-bell"></i></button>
-      <button class="topnav-icon-btn" type="button" aria-label="Centro de soporte" title="Centro de soporte"><i class="fa-solid fa-headset"></i></button>
-      <div class="topnav-avatar-wrap">
-        <a href="../login.html" class="topnav-avatar" aria-label="Volver al login" title="Volver al login"><i class="fa-solid fa-user"></i></a>
-      </div>
-    </div>
+    <div class="topnav-right" id="topnavRight"></div>
   </nav>
 
   <main class="main">
-    <!-- Contenido de la pagina: se construye despues. Por ahora solo el navbar. -->
+    <div class="topbar">
+      <h1>Actividad de mentoria</h1>
+      <span style="font-size:11px;background:#fdeedd;color:#8a5a1a;padding:4px 10px;border-radius:20px;">Extension</span>
+    </div>
+
+    <div class="grid-3" id="metricas"></div>
+
+    <div class="card">
+      <h2>Mentores</h2>
+      <table>
+        <thead><tr><th>Nombre</th><th>Tema</th><th>Sesiones realizadas</th><th>Calificacion</th></tr></thead>
+        <tbody id="tablaMentores"></tbody>
+      </table>
+    </div>
+
+    <!-- MEJORA: vista de coordinador de mentoria, inspirada en el "Program
+    Coordinator Dashboard" de Mentorloop (Participantes / Emparejamientos /
+    Hitos) y en la agregacion de sesiones de TeachBoost Coach. Antes el
+    administrador solo veia totales estaticos por mentor, sin ver ninguna
+    sesion real agendada por los docentes ni sus metas. -->
+    <div class="card" style="margin-top:1rem;">
+      <h2><i class="fa-solid fa-calendar-check"></i> Sesiones de mentoria</h2>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:.85rem;"><i class="fa-solid fa-circle-info"></i> Actividad real de la red de mentoria: quien agendo, con que mentor, y que meta se propuso lograr.</p>
+      <table>
+        <thead><tr><th>Docente</th><th>Mentor</th><th>Horario</th><th>Meta de la sesion</th><th>Estado</th><th></th></tr></thead>
+        <tbody id="tablaSesionesMentoria"></tbody>
+      </table>
+    </div>
   </main>
 </div>
+
+<!-- Perfil rapido: antes el nombre navegaba directo a Gestion de docentes
+     y sacaba al admin de la vista de Mentores que estaba revisando. Ahora
+     abre en el momento (mismo patron que el perfil de docente y el modal
+     de colega); "Ver perfil completo" es la salida explicita para quien
+     de verdad necesita ir a Gestion de docentes (editar, desactivar, etc). -->
+<div class="modal-overlay" id="modalPerfilRapido">
+  <div class="modal-box" style="width:400px;text-align:left;">
+    <div class="mentor-modal-head">
+      <div class="avatar-lg" id="rapidoAvatar"></div>
+      <div>
+        <h3 id="rapidoNombre"></h3>
+        <span id="rapidoSub"></span>
+      </div>
+    </div>
+    <p class="mentor-bio" id="rapidoBio"></p>
+    <table class="table-kv" style="margin-bottom:1rem;">
+      <tr><td style="color:var(--text-muted);width:110px;">Correo</td><td id="rapidoCorreo"></td></tr>
+      <tr><td style="color:var(--text-muted);">Telefono</td><td id="rapidoTelefono"></td></tr>
+    </table>
+    <div id="rapidoMentorInfo"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:.5rem;">
+      <button class="btn btn-outline btn-sm" onclick="cerrarPerfilRapido()">Cerrar</button>
+      <button class="btn btn-primary btn-sm" id="rapidoVerCompleto"><i class="fa-solid fa-arrow-up-right-from-square"></i> Ver perfil completo</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/data.js"></script>
+<script src="../js/app.js"></script>
+<script>
+  requireSesion("admin");
+  const totalSesiones = MENTORES.reduce((s,m) => s + m.sesiones, 0);
+  const mentorTop = MENTORES.reduce((max, m) => m.sesiones > max.sesiones ? m : max, MENTORES[0]);
+
+  document.getElementById("metricas").innerHTML = `
+    <div class="card metric"><div class="num">${MENTORES.length}</div><div class="label">Mentores activos</div></div>
+    <div class="card metric"><div class="num">${totalSesiones}</div><div class="label">Sesiones realizadas</div></div>
+    <div class="card metric"><div class="num" style="font-size:16px;">${mentorTop.tema}</div><div class="label">Tema mas solicitado</div></div>
+  `;
+
+  // Cada mentor ES un docente (los 10 mentores son los mismos 10 docentes,
+  // solo con IDs propios en un arreglo aparte); se resuelven por nombre
+  // completo para poder enlazar a su perfil real (correo, telefono, historial).
+  function idDocenteDeMentor(mentor){
+    const d = DOCENTES.find(x => `${x.nombres} ${x.apellidos}` === mentor.nombres);
+    return d ? d.id : null;
+  }
+
+  function renderMentores(){
+    document.getElementById("tablaMentores").innerHTML = MENTORES.map(m => {
+      const idDoc = idDocenteDeMentor(m);
+      const nombre = idDoc ? `<a href="#" onclick="abrirPerfilRapido(${idDoc});return false;" style="color:var(--info);">${m.nombres}</a>` : m.nombres;
+      return `<tr><td>${nombre}</td><td>${m.tema}</td><td>${m.sesiones}</td><td><i class="fa-solid fa-star" style="color:var(--warning);"></i> ${m.rating}</td></tr>`;
+    }).join("");
+  }
+  renderMentores();
+
+  function renderSesionesMentoria(){
+    const sesiones = todasLasSesionesMentoria();
+    document.getElementById("tablaSesionesMentoria").innerHTML = sesiones.length
+      ? sesiones.map(s => {
+          const m = MENTORES.find(x => x.id === s.id_mentor);
+          const idDocMentor = m ? idDocenteDeMentor(m) : null;
+          const nombreMentor = m ? (idDocMentor ? `<a href="#" onclick="abrirPerfilRapido(${idDocMentor});return false;" style="color:var(--info);">${m.nombres}</a>` : m.nombres) : "Mentor eliminado";
+          return `
+            <tr>
+              <td><a href="#" onclick="abrirPerfilRapido(${s.id_docente}, false);return false;" style="color:var(--info);">${nombreDocente(s.id_docente)}</a></td>
+              <td>${nombreMentor}</td>
+              <td>${s.slot}</td>
+              <td style="max-width:260px;">${s.meta}</td>
+              <td><span class="badge ${s.estado === "completada" ? "badge-completada" : "badge-curso"}">${badgeTexto(s.estado)}</span></td>
+              <td>${s.estado !== "completada" ? `<button class="btn btn-outline btn-sm" onclick="marcarSesionCompletada(${s.id_docente}, ${s.id})"><i class="fa-solid fa-check"></i> Marcar completada</button>` : ""}</td>
+            </tr>
+          `;
+        }).join("")
+      : `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Aun no hay sesiones agendadas.</td></tr>`;
+  }
+  renderSesionesMentoria();
+
+  // Perfil rapido en modal (no navega fuera de Mentores). La seccion "Como
+  // mentor" solo se muestra si ademas se abrio desde un rol de mentor (tabla
+  // Mentores, o columna "Mentor" de Sesiones) — si se abre desde la columna
+  // "Docente" (quien recibe la mentoria en esa fila), se ve solo su ficha
+  // basica, aunque esa misma persona sea mentor en otro contexto: mezclar
+  // ambos roles ahi confunde sobre para que se abrio el perfil.
+  function abrirPerfilRapido(idDocente, mostrarComoMentor){
+    if(mostrarComoMentor === undefined) mostrarComoMentor = true;
+    const d = DOCENTES.find(x => x.id === idDocente);
+    if(!d) return;
+    document.getElementById("rapidoAvatar").textContent = (d.nombres[0] + d.apellidos[0]).toUpperCase();
+    document.getElementById("rapidoNombre").textContent = `${d.nombres} ${d.apellidos}`;
+    document.getElementById("rapidoSub").innerHTML = `<i class="fa-solid fa-bullseye"></i> ${d.especialidad} · ${d.anios_experiencia} anos de experiencia`;
+    document.getElementById("rapidoBio").textContent = d.bio || "";
+    document.getElementById("rapidoCorreo").textContent = d.correo;
+    document.getElementById("rapidoTelefono").textContent = d.telefono;
+
+    const mentorInfo = mostrarComoMentor ? MENTORES.find(m => m.nombres === `${d.nombres} ${d.apellidos}`) : null;
+    const cont = document.getElementById("rapidoMentorInfo");
+    if(mentorInfo){
+      // reviewsDeMentor() ya existia (semilla + resenias reales que dejan los
+      // docentes tras una sesion), pero solo se usaba en el lado docente para
+      // elegir mentor — el coordinador nunca veia el feedback real, solo el
+      // numero de calificacion agregado. Un panel de coordinador real
+      // (TeachBoost Coach, Mentorloop) muestra el feedback cualitativo, no
+      // solo el promedio.
+      const reviews = reviewsDeMentor(mentorInfo.id);
+      cont.innerHTML = `
+        <div class="mentor-modal-section">
+          <h4><i class="fa-solid fa-people-group"></i> Como mentor</h4>
+          <div class="mentor-stats-row">
+            <div><b>${mentorInfo.sesiones}</b><span>Sesiones</span></div>
+            <div><b>${mentorInfo.rating}</b><span>Calificacion</span></div>
+            <div><b>${mentorInfo.tema}</b><span>Tema</span></div>
+          </div>
+          <p style="font-size:11.5px;color:var(--text-muted);margin-top:.5rem;"><i class="fa-solid fa-calendar"></i> Disponible: ${mentorInfo.disponibilidad.join(", ")}</p>
+        </div>
+        ${reviews.length ? `
+          <div class="mentor-modal-section">
+            <h4><i class="fa-solid fa-comment-dots"></i> Resenias de docentes (${reviews.length})</h4>
+            ${reviews.map(r => `
+              <div class="review-item">
+                <div class="r-head"><span>${r.autor}</span><span class="r-stars">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</span></div>
+                <p>${r.comentario}</p>
+              </div>
+            `).join("")}
+          </div>
+        ` : ""}
+      `;
+    } else {
+      cont.innerHTML = "";
+    }
+    document.getElementById("rapidoVerCompleto").onclick = () => { window.location.href = `gestion_docentes.html?docente=${idDocente}`; };
+    document.getElementById("modalPerfilRapido").classList.add("open");
+  }
+  function cerrarPerfilRapido(){
+    document.getElementById("modalPerfilRapido").classList.remove("open");
+  }
+
+  // Cierra el loop: antes ninguna pantalla podia pasar una sesion de
+  // "agendada" a "completada" salvo la semilla — la resenia del docente
+  // (que exige estado==="completada") quedaba inalcanzable para cualquier
+  // sesion real agendada desde el sistema.
+  function marcarSesionCompletada(idDocente, idSesion){
+    actualizarEstadoSesionMentoria(idDocente, idSesion, "completada");
+    showToast("Sesion marcada como completada. El docente ya puede dejar su resenia.", "success");
+    renderSesionesMentoria();
+  }
+</script>
 </body>
 </html>
