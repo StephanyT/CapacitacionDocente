@@ -93,6 +93,21 @@
 <script>
   requireSesion("admin");
 
+  // Trae los docentes reales desde la base de datos (backend/listar_docentes.php)
+  // y los pone en el arreglo DOCENTES para que el resto de la pagina (que ya
+  // esta escrita para leer de DOCENTES) funcione igual que antes.
+  async function cargarDocentesDesdeBD(){
+    try {
+      const resp = await fetch("../backend/listar_docentes.php");
+      const datos = await resp.json();
+      DOCENTES.length = 0;
+      datos.forEach(d => DOCENTES.push(d));
+    } catch(e){
+      showToast("No se pudo conectar con la base de datos", "error");
+    }
+    render();
+  }
+
   function iniciales(nombres, apellidos){ return (nombres[0] + apellidos[0]).toUpperCase(); }
 
   // Paginacion — antes se mostraban todos los docentes en una sola tabla
@@ -151,7 +166,7 @@
 
     renderPaginacionDocentes(totalPaginas);
   }
-  render();
+  cargarDocentesDesdeBD();
 
   let docenteADesactivar = null;
   function abrirDesactivar(id){
@@ -339,7 +354,7 @@
     document.getElementById("errorDocente").style.display = "none";
     document.getElementById("modalDocente").classList.add("open");
   }
-  function guardarDocente(){
+  async function guardarDocente(){
     const datos = {
       nombres: document.getElementById("fNombres").value.trim(),
       apellidos: document.getElementById("fApellidos").value.trim(),
@@ -378,16 +393,37 @@
     errorEl.style.display = "none";
 
     if(docenteEnEdicion){
+      // Editar todavia no esta conectado a la base de datos (falta el UPDATE
+      // en el backend) -- por ahora sigue guardando solo en este navegador.
       guardarDocenteOverride(docenteEnEdicion, datos);
       const d = DOCENTES.find(x => x.id === docenteEnEdicion);
       Object.assign(d, datos, {editado_por: (getSesionActiva()||{}).nombre || "Admin", fecha_edicion: new Date().toISOString().slice(0,10)});
-    } else {
-      const nuevo = crearDocenteLocal(datos);
-      DOCENTES.push(nuevo);
+      cerrarModal();
+      render();
+      showToast("Docente actualizado (todavia solo en este navegador)", "info");
+      return;
     }
-    cerrarModal();
-    render();
-    showToast("Docente guardado correctamente", "success");
+
+    // Crear si es nuevo: esto si va a la base de datos real.
+    try {
+      const resp = await fetch("../backend/insertar_docente.php", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(datos)
+      });
+      const resultado = await resp.json();
+      if(!resultado.ok){
+        errorEl.textContent = resultado.mensaje;
+        errorEl.style.display = "block";
+        return;
+      }
+      cerrarModal();
+      await cargarDocentesDesdeBD();
+      showToast("Docente guardado en la base de datos", "success");
+    } catch(e){
+      errorEl.textContent = "No se pudo conectar con el servidor. Revisa que XAMPP este corriendo.";
+      errorEl.style.display = "block";
+    }
   }
   function cerrarModal(){
     document.getElementById("modalDocente").classList.remove("open");
