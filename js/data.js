@@ -19,7 +19,14 @@ const DOCENTES = [
     bio: "Docente del area de Desarrollo de Software, enfocada en programacion web y buenas practicas de codigo."
   }
 ];
-const ADMINISTRADORES = [];
+const ADMINISTRADORES = [
+  {
+    id: 1,
+    nombres: "Ana",
+    apellidos: "Torres",
+    correo: "ana.torres@certus.edu.pe"
+  }
+];
 const CAPACITACIONES = [];
 const INSCRIPCIONES = [];
 const CONSTANCIAS = [];
@@ -33,14 +40,16 @@ const SUGERENCIAS_CAPACITACION = [];
 
 function getSesionActiva(){
   const raw = sessionStorage.getItem("sesion_certus");
-  return raw ? JSON.parse(raw) : null;
+  if(raw) return JSON.parse(raw);
+  // Sin sistema de sesion todavia (login.html no guarda nada en
+  // sessionStorage) -- usamos una sesion de prueba segun la carpeta actual
+  // (docente/ o admin/) para que el navbar y el contenido se vean completos
+  // (iconos incluidos) mientras se conecta el login real.
+  const esAdmin = location.pathname.includes("/admin/");
+  return esAdmin
+    ? { rol: "admin", id: 1, nombre: "Ana Torres" }
+    : { rol: "docente", id: 1, nombre: "Maria Torres" };
 }
 function requireSesion(rolEsperado){
-  // Sin sistema de sesion todavia (login.html no guarda nada en
-  // sessionStorage) -- en vez de redirigir a login.html, devolvemos una
-  // sesion de prueba para poder ver las paginas directamente. Cuando el
-  // login guarde la sesion real, esto vuelve a redirigir si no hay sesion.
-  const s = getSesionActiva();
-  if(s && (!rolEsperado || s.rol === rolEsperado)) return s;
-  return { rol: rolEsperado || "docente", id: 1, nombre: "Maria Torres" };
+  return getSesionActiva();
 }
