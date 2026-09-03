@@ -23,21 +23,31 @@
       <button type="button" id="btnAdmin">Administrador</button>
     </div>
 
-    <input type="email" id="correo" placeholder="correo@certus.edu.pe">
-    <div class="login-pass-wrap">
-      <input type="password" id="clave" placeholder="Contrasena">
-      <button type="button" class="login-pass-toggle" id="togglePass" aria-label="Mostrar contraseña"><i class="fa-regular fa-eye"></i></button>
-    </div>
-    <button type="button" class="login-submit" onclick="ingresar()">Acceder</button>
+    <form method="POST" action="procesar_login.php" id="formLogin">
+      <input type="hidden" name="rol" id="rolInput" value="docente">
+
+      <input type="email" name="correo" id="correo" placeholder="correo@certus.edu.pe" required>
+      
+      <div class="login-pass-wrap">
+        <input type="password" name="password" id="clave" placeholder="Contrasena" required>
+        <button type="button" class="login-pass-toggle" id="togglePass" aria-label="Mostrar contraseña">
+          <i class="fa-regular fa-eye"></i>
+        </button>
+      </div>
+      
+      <button type="submit" class="login-submit">Acceder</button>
+    </form>
+
     <a href="#" class="login-forgot">¿Has olvidado tu contraseña?</a>
-    <p id="msgError" style="font-size:12px;margin-top:10px;display:none;"></p>
+    
+    <p id="msgError" style="font-size:12px;margin-top:10px;color:#c62828;display:none;">
+      Correo o contraseña incorrectos
+    </p>
   </div>
 </div>
 
-<script src="js/data.js"></script>
-<script src="js/app.js"></script>
 <script>
-  // Mostrar/ocultar contrasena, como el ojo del campo de contrasena real del campus.
+  // Mostrar / ocultar contraseña
   document.getElementById("togglePass").addEventListener("click", () => {
     const clave = document.getElementById("clave");
     const icono = document.querySelector("#togglePass i");
@@ -46,24 +56,22 @@
     icono.className = visible ? "fa-regular fa-eye" : "fa-regular fa-eye-slash";
   });
 
-  // Esta carpeta es solo el punto de partida visual para el equipo (sin
-  // datos todavia), asi que el login no valida nada: el toggle elige el rol
-  // y "Acceder" siempre funciona, para que se entienda el flujo sin
-  // necesitar credenciales reales.
-  let rolSeleccionado = "docente";
+  // Toggle de rol (Docente / Administrador)
   document.getElementById("btnDocente").addEventListener("click", () => {
-    rolSeleccionado = "docente";
+    document.getElementById("rolInput").value = "docente";
     document.getElementById("btnDocente").classList.add("active");
     document.getElementById("btnAdmin").classList.remove("active");
   });
+
   document.getElementById("btnAdmin").addEventListener("click", () => {
-    rolSeleccionado = "admin";
+    document.getElementById("rolInput").value = "admin";
     document.getElementById("btnAdmin").classList.add("active");
     document.getElementById("btnDocente").classList.remove("active");
   });
 
-  function ingresar(){
-    window.location.href = rolSeleccionado === "docente" ? "docente/perfil.html" : "admin/dashboard.html";
+  // Mostrar mensaje de error si viene de la URL
+  if (window.location.search.includes("error=1")) {
+    document.getElementById("msgError").style.display = "block";
   }
 </script>
 </body>
