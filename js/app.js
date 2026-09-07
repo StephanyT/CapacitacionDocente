@@ -84,8 +84,9 @@ function showToast(mensaje, tipo){
 }
 
 function logout(){
-  sessionStorage.removeItem("sesion_certus");
-  window.location.href = "../login.html";
+  try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+  const enSubcarpeta = location.pathname.includes("/docente/") || location.pathname.includes("/admin/");
+  window.location.href = enSubcarpeta ? "../logout.php" : "logout.php";
 }
 
 // Insignias ganadas por un docente, segun capacitaciones completadas (MEJORA)
