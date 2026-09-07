@@ -59,17 +59,51 @@
   });
 
   function ingresar(){
-    // Sin validacion de credenciales: los dos botones entran directo, para
-    // que cualquiera pueda ver y probar la app sin depender de que XAMPP
-    // este corriendo. El login real con contrasena (backend/login.php,
-    // password_hash/password_verify, tabla docentes) sigue existiendo y
-    // funcionando -- solo que esta pantalla ya no lo exige para entrar.
+    const correo = document.getElementById("correo").value.trim();
+    const clave = document.getElementById("clave").value;
+    const msgError = document.getElementById("msgError");
+    msgError.style.display = "none";
     sessionStorage.removeItem("sesion_certus");
+
     if(rolSeleccionado === "admin"){
+      // El login de administrador todavia no esta conectado a la base de
+      // datos (falta esa parte del backend, ver GUIA_BACKEND_EQUIPO) -- por
+      // ahora sigue entrando directo.
       window.location.href = "admin/dashboard.html";
-    } else {
-      window.location.href = "docente/perfil.html";
+      return;
     }
+
+    // Docente SI pide credenciales reales cuando el backend responde
+    // (XAMPP prendido). Si el navegador no logra conectarse (XAMPP apagado,
+    // o abierto por file:// sin servidor), deja entrar en modo vista previa
+    // en vez de trabar por completo -- asi se puede seguir probando el
+    // diseno sin depender de tener XAMPP corriendo todo el tiempo.
+    fetch("backend/login.php", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({correo, password: clave})
+    })
+      .then(resp => resp.json())
+      .then(resultado => {
+        if(!resultado.ok){
+          msgError.style.color = "#ca3120";
+          msgError.textContent = resultado.mensaje;
+          msgError.style.display = "block";
+          return;
+        }
+        sessionStorage.setItem("sesion_certus", JSON.stringify({
+          rol: resultado.rol,
+          id: resultado.id,
+          nombre: resultado.nombre
+        }));
+        window.location.href = "docente/perfil.html";
+      })
+      .catch(() => {
+        msgError.style.color = "#b8860b";
+        msgError.textContent = "No se pudo conectar con el servidor -- entrando en modo vista previa (sin datos reales).";
+        msgError.style.display = "block";
+        setTimeout(() => { window.location.href = "docente/perfil.html"; }, 1200);
+      });
   }
 </script>
 </body>

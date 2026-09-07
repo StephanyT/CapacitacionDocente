@@ -45,7 +45,7 @@
 
 <div class="verif-wrap">
   <div class="verif-head">
-    <span class="tag"><i class="fa-solid fa-shield-halved"></i> Verificacion publica</span>
+    <span class="tag"><i class="fa-solid fa-shield-halved"></i> Verificacion para docentes y administradores</span>
     <h1>Verificar una constancia CERTUS</h1>
     <p>Ingresa el codigo que aparece en la constancia (o escanea su codigo QR) para confirmar que fue emitida por CERTUS y revisar sus datos.</p>
   </div>
@@ -64,6 +64,17 @@
 <script src="js/data.js"></script>
 <script src="js/app.js"></script>
 <script>
+  // A diferencia del resto de la app, aqui SI se exige una sesion real
+  // guardada por el login (no la sesion de prueba de requireSesion, que
+  // nunca bloquea a nadie) -- solo docentes o administradores que
+  // iniciaron sesion de verdad pueden verificar constancias. Ahora mismo
+  // el login no pide credenciales todavia (ver login.html), asi que esta
+  // pagina va a quedar sin acceso hasta que el equipo conecte el login real
+  // -- es el comportamiento esperado, no un error.
+  if(!sessionStorage.getItem("sesion_certus")){
+    window.location.href = "login.html";
+  }
+
   function buscarConstancia(codigoCrudo){
     const codigo = (codigoCrudo || "").trim().toUpperCase();
     const resultado = document.getElementById("resultado");
