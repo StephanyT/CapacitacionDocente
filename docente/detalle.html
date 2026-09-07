@@ -39,25 +39,17 @@
 <script src="../js/app.js"></script>
 <script>
   const sesion = requireSesion("docente");
-  const idInscripcion = parseInt(new URLSearchParams(window.location.search).get("id"));
+  const params = new URLSearchParams(window.location.search);
+  const idInscripcion = parseInt(params.get("id"), 10);
+  const idCapacitacionDirecta = parseInt(params.get("capacitacion"), 10);
+  let capacitaciones = [];
   // BUG real encontrado: antes caia silenciosamente en INSCRIPCIONES[0] si el
   // id de la URL no existia — eso podia mostrar la capacitacion de OTRO
   // docente sin ningun aviso. Ahora se exige que la inscripcion sea tuya, y
   // si no lo es, se redirige en vez de mostrar datos que no te pertenecen.
-  let i = INSCRIPCIONES.find(x => x.id === idInscripcion && x.id_docente === sesion.id);
-  if(!i){
-    i = INSCRIPCIONES.find(x => x.id_docente === sesion.id);
-  }
-  if(!i){
-    // Sin inscripciones todavia (docente recien creado, sin capacitaciones
-    // asignadas aun) — bug real encontrado al vaciar los datos para la demo:
-    // antes esto seguia ejecutando el resto del script sobre un valor
-    // inexistente y se caia con un error. Ahora se redirige y se detiene
-    // aca mismo, sin intentar leer una capacitacion que no existe.
-    window.location.href = "mis_capacitaciones.html";
-    throw new Error("Sin inscripciones — redirigiendo a mis_capacitaciones.html");
-  }
-  const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
+  let i = null;
+  let cap = null;
+  let REFLEX_KEY = "";
 
   // ===== Reflexion personal por tema (MEJORA, solo v2) =====
   // Basado en el ciclo de CPD (Continuing Professional Development) que usan
@@ -67,7 +59,6 @@
   // breve por tema como evidencia personal de su aprendizaje.
   // Esto NO toca i.estado en ningun momento: el estado OFICIAL de la
   // capacitacion sigue siendo actualizado unicamente por el administrador (RF-11).
-  const REFLEX_KEY = `certus_reflexion_${sesion.id}_${cap.id}`;
   function leerReflexiones(){
     try{ return JSON.parse(localStorage.getItem(REFLEX_KEY)) || []; }catch(e){ return []; }
   }
@@ -105,11 +96,12 @@
     document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === `tab-${tab}`));
   }
 
-  const iniciales = (cap.instructor || "C E").replace(/^(Ing\.|Mg\.|Lic\.|Dr\.|Dra\.)\s*/, "").split(" ").slice(0,2).map(w => w[0]).join("").toUpperCase();
+  function renderDetalle(){
+    const iniciales = (cap.instructor || "C E").replace(/^(Ing\.|Mg\.|Lic\.|Dr\.|Dra\.)\s*/, "").split(" ").slice(0,2).map(w => w[0]).join("").toUpperCase();
 
-  const reflexionesArr = leerReflexiones();
+    const reflexionesArr = leerReflexiones();
 
-  document.getElementById("contenido").innerHTML = `
+    document.getElementById("contenido").innerHTML = `
     <div class="detalle-hero">
       <div class="detalle-hero-top">
         <span class="badge ${badgeClase(i.estado)}">${badgeTexto(i.estado)}</span>
@@ -222,7 +214,7 @@
   // Mismo programa, excluyendo la actual. Si el docente ya tiene una
   // inscripcion propia, navega a su detalle; si no, solo informa (no permite
   // autoinscribirse, segun RF-08).
-  const relacionadas = CAPACITACIONES.filter(c => c.programa === cap.programa && c.id !== cap.id).slice(0, 3);
+    const relacionadas = capacitaciones.filter(c => c.programa === cap.programa && c.id !== cap.id).slice(0, 3);
   document.getElementById("relacionadas").innerHTML = relacionadas.length ? relacionadas.map(c => {
     const miInscripcion = INSCRIPCIONES.find(x => x.id_docente === sesion.id && x.id_capacitacion === c.id);
     const accion = miInscripcion
@@ -237,6 +229,50 @@
       </div>
     `;
   }).join("") : `<p style="font-size:12.5px;color:var(--text-muted);">No hay otras capacitaciones en este programa por el momento.</p>`;
+  }
+
+  async function iniciarDetalle(){
+    try{
+      capacitaciones = await listarCapacitacionesBackend();
+
+      if(Number.isInteger(idInscripcion)){
+        i = INSCRIPCIONES.find(x => x.id === idInscripcion && x.id_docente === sesion.id) || null;
+      }
+
+      let idCapacitacion = Number.isInteger(idCapacitacionDirecta) && idCapacitacionDirecta > 0
+        ? idCapacitacionDirecta
+        : (i ? i.id_capacitacion : null);
+
+      if(!idCapacitacion && Number.isInteger(idInscripcion) && idInscripcion > 0){
+        idCapacitacion = idInscripcion;
+      }
+
+      if(!idCapacitacion){
+        window.location.href = "mis_capacitaciones.html";
+        return;
+      }
+
+      cap = await obtenerCapacitacionBackend(idCapacitacion);
+      REFLEX_KEY = `certus_reflexion_${sesion.id}_${cap.id}`;
+
+      if(!i){
+        i = {
+          id: null,
+          id_docente: sesion.id,
+          id_capacitacion: cap.id,
+          estado: "pendiente",
+          fecha_limite: cap.fecha
+        };
+      }
+
+      renderDetalle();
+    }catch(error){
+      document.getElementById("contenido").innerHTML =
+        `<div class="card"><p style="font-size:13px;color:#c62828;">${error.message}</p></div>`;
+    }
+  }
+
+  iniciarDetalle();
 </script>
 </body>
 </html>

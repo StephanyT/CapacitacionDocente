@@ -81,11 +81,26 @@
 <script>
   const sesion = requireSesion("docente");
 
-  const misInscripciones = INSCRIPCIONES.filter(i => i.id_docente === sesion.id);
+  let capacitaciones = [];
+  let misInscripciones = [];
+  let disponibles = [];
+
+  function capacitacionPorId(id){
+    return capacitaciones.find(c => c.id === id);
+  }
 
   function render(){
-    document.getElementById("listaCapacitaciones").innerHTML = misInscripciones.map(i => {
-      const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
+    document.getElementById("listaCapacitaciones").innerHTML = misInscripciones.length ? misInscripciones.map(i => {
+      const cap = capacitacionPorId(i.id_capacitacion);
+      if(!cap){
+        return `<div class="card" data-estado="${i.estado}" style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <b>Capacitacion no disponible</b><br>
+            <span style="font-size:12px;color:#6a737b;">ID ${i.id_capacitacion}</span>
+          </div>
+          <span class="badge ${badgeClase(i.estado)}">${badgeTexto(i.estado)}</span>
+        </div>`;
+      }
       const accion = i.estado === "completada"
         ? `<button class="btn btn-outline btn-sm" onclick="verCompletada(${i.id})"><i class="fa-solid fa-eye"></i> Ver</button>`
         : `<a href="detalle.html?id=${i.id}" class="btn btn-outline btn-sm"><i class="fa-solid fa-eye"></i> Ver detalle</a>`;
@@ -99,15 +114,16 @@
           ${accion}
         </div>
       </div>`;
-    }).join("");
+    }).join("") : `<p style="font-size:13px;color:var(--text-muted);">Aun no tienes capacitaciones asignadas.</p>`;
   }
-  render();
 
   // RF-09: el docente tambien debe poder ver las capacitaciones disponibles
   // (no asignadas) ademas de las asignadas. Es solo informativo — RF-08
   // dice que solo el admin puede asignar, el docente no se auto-inscribe.
-  const idsAsignados = new Set(misInscripciones.map(i => i.id_capacitacion));
-  const disponibles = CAPACITACIONES.filter(c => !idsAsignados.has(c.id));
+  function actualizarDisponibles(){
+    const idsAsignados = new Set(misInscripciones.map(i => i.id_capacitacion));
+    disponibles = capacitaciones.filter(c => c.activo && !idsAsignados.has(c.id));
+  }
 
   // RF-08 sigue intacto: "solicitar" nunca crea la inscripcion. Solo deja
   // una peticion visible para el administrador (patron real de "Request
@@ -133,10 +149,9 @@
       </div>
     `).join("") || `<p style="font-size:13px;color:var(--text-muted);">Ya tienes todas las capacitaciones disponibles asignadas.</p>`;
   }
-  renderDisponibles();
-
   function verDisponible(idCap){
-    const cap = CAPACITACIONES.find(c => c.id === idCap);
+    const cap = capacitacionPorId(idCap);
+    if(!cap){ showToast("No se encontro la capacitacion.", "error"); return; }
     const s = solicitudDe(sesion.id, idCap);
     let estadoBox;
     if(s && s.estado === "pendiente"){
@@ -185,8 +200,6 @@
     verDisponible(idCap);
   }
 
-  activarFiltrosChip(".chip", "#listaCapacitaciones .card");
-
   document.getElementById("buscador").addEventListener("input", (e) => {
     const q = e.target.value.toLowerCase();
     document.querySelectorAll("#listaCapacitaciones .card").forEach(card => {
@@ -196,7 +209,8 @@
 
   function verCompletada(idInscripcion){
     const i = INSCRIPCIONES.find(x => x.id === idInscripcion);
-    const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
+    const cap = i ? capacitacionPorId(i.id_capacitacion) : null;
+    if(!cap){ showToast("No se encontro la capacitacion.", "error"); return; }
     document.getElementById("modalTexto").textContent = `Completaste "${cap.titulo}". Tu constancia ya esta disponible para descargar.`;
     document.getElementById("linkDetalleCompletada").href = `detalle.html?id=${i.id}`;
     document.getElementById("modalCompletada").classList.add("open");
@@ -220,8 +234,6 @@
         `).join("")
       : "";
   }
-  renderSugerencias();
-
   document.getElementById("btnEnviarSugerencia").addEventListener("click", () => {
     const titulo = document.getElementById("sugTitulo").value.trim();
     const detalle = document.getElementById("sugDetalle").value.trim();
@@ -232,6 +244,25 @@
     showToast("Sugerencia enviada. Gracias por tu aporte.", "success");
     renderSugerencias();
   });
+
+  async function iniciarPagina(){
+    try{
+      capacitaciones = await listarCapacitacionesBackend();
+      misInscripciones = INSCRIPCIONES.filter(i => i.id_docente === sesion.id);
+      actualizarDisponibles();
+      render();
+      renderDisponibles();
+      activarFiltrosChip(".chip", "#listaCapacitaciones .card");
+      renderSugerencias();
+    }catch(error){
+      document.getElementById("listaCapacitaciones").innerHTML =
+        `<p style="font-size:13px;color:#c62828;">${error.message}</p>`;
+      document.getElementById("listaDisponibles").innerHTML =
+        `<p style="font-size:13px;color:#c62828;">No se pudieron cargar las capacitaciones.</p>`;
+    }
+  }
+
+  iniciarPagina();
 </script>
 </body>
 </html>

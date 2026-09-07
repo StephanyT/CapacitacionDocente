@@ -46,6 +46,107 @@ function nombreCapacitacion(id){
   return c ? c.titulo : "-";
 }
 
+function normalizarCapacitacion(cap){
+  ["objetivos", "temario", "habilidades"].forEach(campo => {
+    if(Array.isArray(cap[campo])) return;
+    if(typeof cap[campo] === "string" && cap[campo].trim()){
+      try{
+        const parsed = JSON.parse(cap[campo]);
+        cap[campo] = Array.isArray(parsed) ? parsed : [];
+      }catch(e){
+        cap[campo] = cap[campo].split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+      }
+    } else {
+      cap[campo] = [];
+    }
+  });
+
+  cap.id = parseInt(cap.id, 10);
+  cap.activo = cap.activo === true || cap.activo === 1 || cap.activo === "1";
+  return cap;
+}
+
+function sincronizarCapacitacionesBackend(lista){
+  CAPACITACIONES.splice(0, CAPACITACIONES.length, ...lista.map(c => normalizarCapacitacion({...c})));
+}
+
+async function apiCapacitaciones(ruta, opciones){
+  const url = rutaBackendCertus(`api/capacitaciones/${ruta}`);
+  const config = {
+    credentials: "same-origin",
+    headers: { "Accept": "application/json" },
+    ...(opciones || {})
+  };
+
+  if(config.body && !(config.body instanceof FormData)){
+    config.headers = {
+      ...config.headers,
+      "Content-Type": "application/json"
+    };
+    if(typeof config.body !== "string"){
+      config.body = JSON.stringify(config.body);
+    }
+  }
+
+  const respuesta = await fetch(url, config);
+  let datos = null;
+
+  try{
+    datos = await respuesta.json();
+  }catch(e){
+    datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+  }
+
+  if(respuesta.status === 401 || respuesta.status === 403){
+    try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+    if(respuesta.status === 401){
+      window.location.replace(rutaLoginCertus());
+    }
+  }
+
+  if(!respuesta.ok || !datos.ok){
+    throw new Error(datos.mensaje || "No se pudo completar la operacion.");
+  }
+
+  return datos;
+}
+
+async function listarCapacitacionesBackend(){
+  const datos = await apiCapacitaciones("listar.php");
+  const capacitaciones = (datos.capacitaciones || []).map(cap => normalizarCapacitacion(cap));
+  sincronizarCapacitacionesBackend(capacitaciones);
+  return capacitaciones;
+}
+
+async function obtenerCapacitacionBackend(id){
+  const datos = await apiCapacitaciones(`detalle.php?id=${encodeURIComponent(id)}`);
+  return normalizarCapacitacion(datos.capacitacion);
+}
+
+async function crearCapacitacionBackend(datos){
+  const respuesta = await apiCapacitaciones("crear.php", {
+    method: "POST",
+    body: datos
+  });
+  return normalizarCapacitacion(respuesta.capacitacion);
+}
+
+async function editarCapacitacionBackend(id, datos){
+  const respuesta = await apiCapacitaciones("editar.php", {
+    method: "POST",
+    body: { id, ...datos }
+  });
+  return normalizarCapacitacion(respuesta.capacitacion);
+}
+
+async function cambiarEstadoCapacitacionBackend(id, activo){
+  const respuesta = await apiCapacitaciones("cambiar_estado.php", {
+    method: "POST",
+    body: { id, activo }
+  });
+  return normalizarCapacitacion(respuesta.capacitacion);
+}
+
 // Animacion de conteo para las tarjetas de metricas
 function animateCount(el, target, suffix){
   suffix = suffix || "";

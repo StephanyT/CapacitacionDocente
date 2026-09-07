@@ -103,7 +103,8 @@
 <script src="../js/data.js"></script>
 <script src="../js/app.js"></script>
 <script>
-  requireSesion("admin");
+  const sesion = requireSesion("admin");
+  let capacitaciones = [];
 
   function contarDocentes(idCap){
     return INSCRIPCIONES.filter(i => i.id_capacitacion === idCap).length;
@@ -138,10 +139,10 @@
   }
 
   function render(){
-    const totalPaginas = Math.max(1, Math.ceil(CAPACITACIONES.length / CAPACITACIONES_POR_PAGINA));
+    const totalPaginas = Math.max(1, Math.ceil(capacitaciones.length / CAPACITACIONES_POR_PAGINA));
     if(paginaActualCapacitaciones > totalPaginas) paginaActualCapacitaciones = totalPaginas;
     const inicio = (paginaActualCapacitaciones - 1) * CAPACITACIONES_POR_PAGINA;
-    const pagina = CAPACITACIONES.slice(inicio, inicio + CAPACITACIONES_POR_PAGINA);
+    const pagina = capacitaciones.slice(inicio, inicio + CAPACITACIONES_POR_PAGINA);
 
     document.getElementById("tablaCapacitaciones").innerHTML = pagina.length ? pagina.map(c => `
       <tr>
@@ -149,10 +150,11 @@
         <td>${c.fecha}</td>
         <td>${c.sede} ${esVirtual(c) ? `<i class="fa-solid fa-laptop" style="color:var(--info);" title="Aula Virtual"></i>` : ""}</td>
         <td>${c.programa}</td>
-        <td><span class="badge badge-curso">${c.estado}</span></td>
+        <td><span class="badge ${c.activo ? "badge-curso" : "badge-pendiente"}">${c.estado}</span></td>
         <td>${contarDocentes(c.id)} asignados</td>
         <td style="display:flex;gap:6px;">
           <button class="btn btn-outline btn-sm" onclick="abrirEditar(${c.id})"><i class="fa-solid fa-pen"></i> Editar</button>
+          <button class="btn btn-outline btn-sm" onclick="cambiarEstadoCapacitacion(${c.id}, ${!c.activo})"><i class="fa-solid ${c.activo ? "fa-ban" : "fa-rotate-left"}"></i> ${c.activo ? "Desactivar" : "Reactivar"}</button>
           <button class="btn btn-outline btn-sm" onclick="abrirDocentes(${c.id})"><i class="fa-solid fa-users"></i> Docentes</button>
         </td>
       </tr>
@@ -160,8 +162,6 @@
 
     renderPaginacionCapacitaciones(totalPaginas);
   }
-  render();
-
   let idCapacitacionEnEdicion = null;
 
   function renderCheckDocentes(idCap){
@@ -185,7 +185,8 @@
   }
   function abrirEditar(id){
     idCapacitacionEnEdicion = id;
-    const c = CAPACITACIONES.find(x => x.id === id);
+    const c = capacitaciones.find(x => x.id === id);
+    if(!c){ showToast("No se encontro la capacitacion.", "error"); return; }
     document.getElementById("tituloModalForm").textContent = "Editar capacitacion";
     document.getElementById("fTitulo").value = c.titulo;
     document.getElementById("fDescripcion").value = c.descripcion;
@@ -196,25 +197,29 @@
     renderCheckDocentes(id);
     document.getElementById("modalForm").classList.add("open");
   }
-  function guardarCapacitacion(){
+  async function guardarCapacitacion(){
     const titulo = document.getElementById("fTitulo").value.trim();
     if(!titulo){ showToast("El titulo es obligatorio", "error"); return; }
 
     let idCap = idCapacitacionEnEdicion;
+    const capActual = idCap ? capacitaciones.find(c => c.id === idCap) : null;
+    if(idCap && !capActual){ showToast("No se encontro la capacitacion.", "error"); return; }
+
     const datos = {
       titulo,
       descripcion: document.getElementById("fDescripcion").value,
       fecha: document.getElementById("fFecha").value,
       duracion: document.getElementById("fDuracion").value,
-      estado: "activa",
+      estado: capActual ? capActual.estado : "activa",
       sede: document.getElementById("fSede").value,
       programa: document.getElementById("fPrograma").value
     };
 
+    try{
     if(idCap){
-      const cap = CAPACITACIONES.find(c => c.id === idCap);
-      const fechaAnterior = cap.fecha;
-      Object.assign(cap, datos);
+      const fechaAnterior = capActual.fecha;
+      const actualizada = await editarCapacitacionBackend(idCap, datos);
+      Object.assign(capActual, actualizada);
       // Si se reprogramo la fecha de la capacitacion, mover la fecha limite
       // de los docentes que aun no completan por la misma cantidad de dias
       // (preserva el margen original en vez de dejar el semaforo desincronizado
@@ -230,8 +235,9 @@
           });
       }
     } else {
-      idCap = Math.max(0, ...CAPACITACIONES.map(c => c.id)) + 1;
-      CAPACITACIONES.push({id: idCap, ...datos});
+      const creada = await crearCapacitacionBackend(datos);
+      idCap = creada.id;
+      capacitaciones.push(creada);
     }
 
     // RF-08: asignar la capacitacion a los docentes marcados
@@ -250,10 +256,31 @@
 
     cerrarModales();
     showToast("Capacitacion guardada correctamente", "success");
+    }catch(error){
+      showToast(error.message, "error");
+    }
+  }
+
+  async function cambiarEstadoCapacitacion(idCap, activo){
+    const cap = capacitaciones.find(c => c.id === idCap);
+    if(!cap){ showToast("No se encontro la capacitacion.", "error"); return; }
+    const accion = activo ? "reactivar" : "desactivar";
+    if(!confirm(`Deseas ${accion} esta capacitacion?`)) return;
+
+    try{
+      const actualizada = await cambiarEstadoCapacitacionBackend(idCap, activo);
+      Object.assign(cap, actualizada);
+      showToast(actualizada.activo ? "Capacitacion reactivada" : "Capacitacion desactivada", "success");
+      render();
+      renderSolicitudes();
+    }catch(error){
+      showToast(error.message, "error");
+    }
   }
 
   function abrirDocentes(idCap){
-    const cap = CAPACITACIONES.find(c => c.id === idCap);
+    const cap = capacitaciones.find(c => c.id === idCap);
+    if(!cap){ showToast("No se encontro la capacitacion.", "error"); return; }
     document.getElementById("tituloModalDocentes").textContent = "Docentes de: " + cap.titulo;
     const inscritos = INSCRIPCIONES.filter(i => i.id_capacitacion === idCap);
     document.getElementById("tablaDocentesCap").innerHTML = inscritos.map(i => `
@@ -314,7 +341,7 @@
     if(pendientes.length === 0){ card.style.display = "none"; return; }
     card.style.display = "block";
     document.getElementById("listaSolicitudesAdmin").innerHTML = pendientes.map(s => {
-      const cap = CAPACITACIONES.find(c => c.id === s.id_capacitacion);
+      const cap = capacitaciones.find(c => c.id === s.id_capacitacion);
       return `
         <div class="review-item">
           <div class="r-head">
@@ -330,8 +357,6 @@
       `;
     }).join("");
   }
-  renderSolicitudes();
-
   function aprobarSolicitud(idSolicitud){
     const sesion = getSesionActiva();
     aprobarSolicitudCapacitacion(idSolicitud, (sesion||{}).nombre || "Admin");
@@ -367,8 +392,6 @@
       </div>
     `).join("");
   }
-  renderSugerencias();
-
   function atenderSugerencia(idDocente, idSugerencia){
     marcarSugerenciaAtendida(idDocente, idSugerencia);
     showToast("Sugerencia marcada como atendida", "success");
@@ -378,6 +401,20 @@
     abrirNueva();
     document.getElementById("fTitulo").value = titulo;
   }
+
+  async function cargarCapacitacionesAdmin(){
+    try{
+      capacitaciones = await listarCapacitacionesBackend();
+      render();
+      renderSolicitudes();
+      renderSugerencias();
+    }catch(error){
+      document.getElementById("tablaCapacitaciones").innerHTML =
+        `<tr><td colspan="7" style="text-align:center;color:#c62828;">${error.message}</td></tr>`;
+    }
+  }
+
+  cargarCapacitacionesAdmin();
 </script>
 </body>
 </html>

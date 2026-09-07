@@ -60,8 +60,12 @@
 <script>
   const sesion = requireSesion("admin");
 
+  async function iniciarDashboard(){
+  try{
+  const capacitaciones = await listarCapacitacionesBackend();
+
   const totalDocentes = DOCENTES.length;
-  const totalCapacitaciones = CAPACITACIONES.length;
+  const totalCapacitaciones = capacitaciones.filter(c => c.activo).length;
   const completadas = INSCRIPCIONES.filter(i => i.estado === "completada").length;
   const enCurso = INSCRIPCIONES.filter(i => i.estado === "en curso").length;
   const pendientes = INSCRIPCIONES.filter(i => i.estado === "pendiente").length;
@@ -189,6 +193,13 @@
       <td>${semaforoTexto(i)}</td>
     </tr>
   `).join("");
+  }catch(error){
+    document.getElementById("metricas").innerHTML =
+      `<div class="card"><p style="font-size:13px;color:#c62828;">${error.message}</p></div>`;
+  }
+  }
+
+  iniciarDashboard();
 </script>
 </body>
 </html>
