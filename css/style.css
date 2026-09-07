@@ -18,7 +18,12 @@
   color-scheme:light;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-html{scroll-behavior:smooth;}
+/* Sin esto, la barra de scroll vertical del navegador aparece y desaparece
+   segun cuanto contenido tenga cada pagina, y le "roba" su ancho al resto
+   del contenido justo cuando aparece -- eso es lo que dejaba tarjetas como
+   la de Semaforo de cumplimiento con la esquina derecha tapada. Reservando
+   ese espacio siempre, la pagina nunca se corre de golpe. */
+html{scroll-behavior:smooth;overflow-y:scroll;scrollbar-gutter:stable;}
 body{
   font-family:'Roboto','Segoe UI',Arial,sans-serif;
   background:var(--bg);
@@ -132,8 +137,10 @@ ul{list-style:none;}
 .brand-logo{height:24px;width:auto;flex-shrink:0;display:block;}
 .brand-divider{width:1px;height:20px;background:rgba(255,255,255,.3);flex-shrink:0;}
 .brand-label{font-size:14.46px;font-weight:700;color:#fff;letter-spacing:.2px;text-transform:uppercase;white-space:nowrap;}
-.topnav-links{display:flex;align-items:center;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none;height:100%;}
-.topnav-links::-webkit-scrollbar{display:none;}
+.topnav-links{display:flex;align-items:center;gap:2px;flex:1;overflow-x:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.35) transparent;height:100%;}
+.topnav-links::-webkit-scrollbar{height:5px;}
+.topnav-links::-webkit-scrollbar-thumb{background:rgba(255,255,255,.35);border-radius:3px;}
+.topnav-links::-webkit-scrollbar-track{background:transparent;}
 .topnav-links a{
   display:flex;align-items:center;white-space:nowrap;height:100%;padding:0 12px;
   font-size:14.46px;font-weight:600;color:#c9d3e8;border-bottom:2px solid transparent;
@@ -141,7 +148,7 @@ ul{list-style:none;}
 }
 .topnav-links a:hover{color:#fff;}
 .topnav-links a.active{color:#fff;font-weight:700;border-bottom-color:#fff;}
-.topnav-right{display:flex;align-items:center;gap:4px;flex-shrink:0;}
+.topnav-right{display:flex;align-items:center;gap:4px;flex-shrink:0;margin-left:auto;}
 .topnav-icon-btn{
   width:36px;height:36px;border-radius:50%;border:none;background:transparent;color:#c9d3e8;
   display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;
@@ -156,7 +163,7 @@ ul{list-style:none;}
 }
 .topnav-avatar:hover{background:rgba(255,255,255,.3);}
 .topnav-avatar-dropdown{
-  display:none;position:absolute;top:44px;right:0;width:200px;
+  display:none;position:absolute;top:44px;right:0;width:200px;max-width:92vw;
   background:var(--surface);border:1px solid var(--border-color);border-radius:12px;
   box-shadow:0 20px 45px rgba(0,20,60,.18);z-index:60;overflow:hidden;animation:slideUp .2s ease;
 }
@@ -169,10 +176,32 @@ ul{list-style:none;}
   transition:background .12s ease;
 }
 .topnav-avatar-dropdown a:hover{background:var(--bg);}
+
+/* Menu hamburguesa (pantallas angostas) -- reemplaza el menu horizontal
+   cuando no cabe entero, en vez de dejarlo con scroll escondido. */
+.topnav-hamburger{
+  display:none;width:36px;height:36px;border-radius:8px;border:none;background:transparent;
+  color:#fff;font-size:17px;cursor:pointer;align-items:center;justify-content:center;
+  flex-shrink:0;font-family:inherit;
+}
+.topnav-hamburger:hover{background:rgba(255,255,255,.14);}
+.topnav-mobile-menu{
+  display:none;flex-direction:column;position:absolute;top:70px;left:0;right:0;
+  background:var(--navy-dark);box-shadow:0 12px 24px rgba(0,0,0,.25);z-index:55;
+  max-height:calc(100vh - 70px);overflow-y:auto;
+}
+.topnav-mobile-menu.open{display:flex;}
+.topnav-mobile-menu a{
+  color:#c9d3e8;padding:14px 1.5rem;font-size:14px;font-weight:600;
+  border-left:3px solid transparent;
+}
+.topnav-mobile-menu a:hover,.topnav-mobile-menu a.active{color:#fff;background:rgba(255,255,255,.06);border-left-color:#fff;}
+
 @media(max-width:820px){
   .brand-label{display:none;}
-  .topnav{padding:0 1.25rem;gap:1rem;}
-  .topnav-links a{padding:0 9px;font-size:12px;}
+  .topnav{padding:0 1.25rem;gap:.75rem;position:relative;}
+  .topnav-links{display:none;}
+  .topnav-hamburger{display:flex;}
 }
 
 /* ===== CARDS ===== */
@@ -182,6 +211,12 @@ ul{list-style:none;}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;}
 .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1.25rem;}
 .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;}
+/* Por defecto, una columna de CSS Grid no se encoge mas alla del tamano
+   natural de su contenido -- y un <canvas> de Chart.js "impone" su propio
+   tamano como minimo. Eso es lo que forzaba a toda la pagina a desbordarse
+   de lado cuando la ventana se achicaba (no era un problema del grafico en
+   si, sino de esta regla que faltaba). */
+.grid-2>*,.grid-3>*,.grid-4>*,.profile-stats>*,.insignias-grid>*{min-width:0;}
 .metric{text-align:center;}
 .metric:hover{box-shadow:0 6px 18px rgba(0,32,91,.1);transform:translateY(-2px);}
 .metric .icon-wrap{width:38px;height:38px;border-radius:10px;background:rgba(0,32,91,.08);color:var(--navy);display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:16px;}
@@ -211,8 +246,18 @@ ul{list-style:none;}
 .search-box input{border:none;outline:none;flex:1;font-size:13px;font-family:inherit;}
 
 /* ===== TABLA ===== */
+/* Ojo: poner display:block directamente en <table> (intento anterior) rompia
+   las tablas angostas o vacias -- una fila de encabezado sin datos se
+   encogia a solo el ancho de su propio texto en vez de ocupar toda la
+   tarjeta, dejando un hueco en blanco al lado (el bug que se reporto).
+   La forma correcta es dejar la tabla con su layout nativo y envolverla en
+   un contenedor aparte (.table-scroll) que sea el que se desplaza de lado. */
 table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:var(--radius);overflow:hidden;}
-th,td{text-align:left;padding:11px 12px;font-size:13px;border-bottom:1px solid var(--border-color);color:var(--text);}
+th,td{text-align:left;padding:11px 12px;font-size:13px;border-bottom:1px solid var(--border-color);color:var(--text);white-space:nowrap;}
+.table-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--secondary) transparent;border-radius:var(--radius);}
+.table-scroll::-webkit-scrollbar{height:5px;}
+.table-scroll::-webkit-scrollbar-thumb{background:var(--secondary);border-radius:3px;}
+.table-scroll::-webkit-scrollbar-track{background:transparent;}
 th{background:var(--bg);color:var(--text-muted);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.03em;}
 tbody tr{transition:background .12s ease;}
 tbody tr:hover{background:rgba(0,32,91,.04);}
@@ -556,12 +601,8 @@ tbody tr:last-child td{border-bottom:none;}
 @media(max-width:640px){
   .grid-2,.grid-3,.grid-4,.profile-stats{grid-template-columns:1fr;}
   .insignias-grid{grid-template-columns:repeat(2,1fr);}
-  /* Bug real: las tablas (Reportes con 9 columnas, Gestion de docentes,
-     Sesiones de mentoria, etc.) no tenian ninguna salida en celular — las
-     columnas se aplastaban ilegibles porque el ancho del contenedor nunca
-     alcanza. display:block+overflow-x:auto conserva el ancho natural de
-     cada columna y agrega scroll horizontal solo cuando hace falta. */
-  table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;}
+  /* La regla de scroll horizontal de las tablas ahora es universal (ver
+     seccion "===== TABLA ====="), no solo aqui en celular. */
 }
 
 /* ===== INSIGHT CARD (resumen inteligente) ===== */

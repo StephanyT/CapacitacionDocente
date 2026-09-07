@@ -45,10 +45,12 @@
       </div>
       <div class="card">
         <h2><i class="fa-solid fa-traffic-light"></i> Semaforo de cumplimiento</h2>
-        <table>
+        <div class="table-scroll">
+<table>
           <thead><tr><th></th><th>Docente</th><th>Capacitacion</th><th>Estado</th></tr></thead>
           <tbody id="tablaSemaforo"></tbody>
         </table>
+</div>
       </div>
     </div>
   </main>
@@ -153,6 +155,21 @@
   animateCount(document.getElementById("numCapacitaciones"), totalCapacitaciones);
   animateCount(document.getElementById("numAvance"), avance, "%");
   animateCount(document.getElementById("numMentores"), MENTORES.length);
+
+  // El conteo de docentes de arriba (totalDocentes) es del arreglo local
+  // vacio -- a diferencia de capacitaciones/mentores, docentes ya tiene
+  // backend real, asi que se corrige aparte con el numero real apenas
+  // responde. Si el backend no responde (sin XAMPP), se queda con el 0 de
+  // siempre.
+  (async function corregirTotalDocentes(){
+    try {
+      const resp = await fetch("../backend/listar_docentes.php");
+      const lista = await resp.json();
+      animateCount(document.getElementById("numDocentes"), lista.length);
+    } catch(e) {
+      // sin backend disponible, se queda con el conteo local (0)
+    }
+  })();
 
   new Chart(document.getElementById("chartEstados"), {
     type: "bar",

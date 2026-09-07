@@ -59,43 +59,17 @@
   });
 
   function ingresar(){
-    const correo = document.getElementById("correo").value.trim();
-    const clave = document.getElementById("clave").value;
-    const msgError = document.getElementById("msgError");
-    msgError.style.display = "none";
-
+    // Sin validacion de credenciales: los dos botones entran directo, para
+    // que cualquiera pueda ver y probar la app sin depender de que XAMPP
+    // este corriendo. El login real con contrasena (backend/login.php,
+    // password_hash/password_verify, tabla docentes) sigue existiendo y
+    // funcionando -- solo que esta pantalla ya no lo exige para entrar.
+    sessionStorage.removeItem("sesion_certus");
     if(rolSeleccionado === "admin"){
-      // El login de administrador todavia no esta conectado a la base de
-      // datos (falta esa parte del backend) -- por ahora sigue entrando directo.
       window.location.href = "admin/dashboard.html";
-      return;
+    } else {
+      window.location.href = "docente/perfil.html";
     }
-
-    fetch("backend/login.php", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({correo, password: clave})
-    })
-      .then(resp => resp.json())
-      .then(resultado => {
-        if(!resultado.ok){
-          msgError.style.color = "#ca3120";
-          msgError.textContent = resultado.mensaje;
-          msgError.style.display = "block";
-          return;
-        }
-        sessionStorage.setItem("sesion_certus", JSON.stringify({
-          rol: resultado.rol,
-          id: resultado.id,
-          nombre: resultado.nombre
-        }));
-        window.location.href = "docente/perfil.html";
-      })
-      .catch(() => {
-        msgError.style.color = "#ca3120";
-        msgError.textContent = "No se pudo conectar con el servidor. Revisa que XAMPP este corriendo.";
-        msgError.style.display = "block";
-      });
   }
 </script>
 </body>

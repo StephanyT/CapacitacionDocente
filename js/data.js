@@ -6,27 +6,8 @@
 // administradores, capacitaciones ni nada cargado todavia.
 // ============================================================
 
-const DOCENTES = [
-  {
-    id: 1,
-    nombres: "Maria",
-    apellidos: "Torres",
-    correo: "maria.torres@certus.edu.pe",
-    dni: "12345678",
-    telefono: "987654321",
-    especialidad: "Desarrollo de Software",
-    anios_experiencia: 5,
-    bio: "Docente del area de Desarrollo de Software, enfocada en programacion web y buenas practicas de codigo."
-  }
-];
-const ADMINISTRADORES = [
-  {
-    id: 1,
-    nombres: "Ana",
-    apellidos: "Torres",
-    correo: "ana.torres@certus.edu.pe"
-  }
-];
+const DOCENTES = [];
+const ADMINISTRADORES = [];
 const CAPACITACIONES = [];
 const INSCRIPCIONES = [];
 const CONSTANCIAS = [];
@@ -47,8 +28,8 @@ function getSesionActiva(){
   // (iconos incluidos) mientras se conecta el login real.
   const esAdmin = location.pathname.includes("/admin/");
   return esAdmin
-    ? { rol: "admin", id: 1, nombre: "Ana Torres" }
-    : { rol: "docente", id: 1, nombre: "Maria Torres" };
+    ? { rol: "admin", id: 1, nombre: "Administrador" }
+    : { rol: "docente", id: 1, nombre: "Docente" };
 }
 function requireSesion(rolEsperado){
   return getSesionActiva();

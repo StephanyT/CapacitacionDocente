@@ -160,7 +160,15 @@
 <script src="../js/app.js"></script>
 <script>
   const sesion = requireSesion("docente");
-  let docente = DOCENTES.find(d => d.id === sesion.id) || DOCENTES[0];
+  // Si no hay docentes reales todavia (backend apagado, o ninguno creado),
+  // se arma un respaldo minimo con el nombre de la sesion para que la
+  // pagina no se rompa -- ya no depende de que exista un docente de
+  // ejemplo en data.js.
+  const [nombreResp, ...apellidoResp] = (sesion.nombre || "Docente").trim().split(/\s+/);
+  let docente = DOCENTES.find(d => d.id === sesion.id) || {
+    nombres: nombreResp, apellidos: apellidoResp.join(" ") || "-",
+    especialidad: "Sin especialidad", anios_experiencia: 0, bio: ""
+  };
   const insignias = insigniasDeDocente(sesion.id);
   const ganadas = insignias.filter(i => i.ganada).length;
   const misInscripciones = INSCRIPCIONES.filter(i => i.id_docente === sesion.id);

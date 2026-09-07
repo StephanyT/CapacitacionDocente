@@ -967,4 +967,37 @@ document.addEventListener("DOMContentLoaded", () => {
   initSoporte();
   initUserMenu();
   initAsistente();
+  initMobileNav();
 });
+
+// Cuando la ventana se achica, el menu (Perfil, Mis capacitaciones, etc.) no
+// cabe entero. En vez de dejarlo con scroll horizontal escondido (donde las
+// pestanas parecian "desaparecer"), se agrega un boton de hamburguesa que
+// abre el mismo menu en una lista vertical -- el patron estandar de
+// navegacion responsive.
+function initMobileNav(){
+  const nav = document.querySelector(".topnav");
+  const links = document.querySelector(".topnav-links");
+  if(!nav || !links || document.querySelector(".topnav-hamburger")) return;
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "topnav-hamburger";
+  btn.setAttribute("aria-label", "Abrir menu");
+  btn.innerHTML = '<i class="fa-solid fa-bars"></i>';
+  nav.insertBefore(btn, nav.firstChild);
+
+  const panel = document.createElement("div");
+  panel.className = "topnav-mobile-menu";
+  panel.innerHTML = links.innerHTML;
+  nav.appendChild(panel);
+
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    panel.classList.toggle("open");
+  });
+  panel.addEventListener("click", (e) => {
+    if(e.target.tagName === "A") panel.classList.remove("open");
+  });
+  document.addEventListener("click", () => panel.classList.remove("open"));
+}

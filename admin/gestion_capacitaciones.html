@@ -33,10 +33,12 @@
       <button class="btn btn-primary" onclick="abrirNueva()"><i class="fa-solid fa-plus"></i> Nueva capacitacion</button>
     </div>
 
-    <table>
+    <div class="table-scroll">
+<table>
       <thead><tr><th>Titulo</th><th>Fecha</th><th>Sede</th><th>Programa</th><th>Estado</th><th>Docentes</th><th></th></tr></thead>
       <tbody id="tablaCapacitaciones"></tbody>
     </table>
+</div>
     <nav aria-label="Paginacion de capacitaciones" style="margin-top:1rem;">
       <ul class="pager" id="paginacionCapacitaciones"></ul>
     </nav>
@@ -90,10 +92,12 @@
 <div class="modal-overlay" id="modalDocentes">
   <div class="modal-box" style="width:460px;text-align:left;">
     <h3 id="tituloModalDocentes">Docentes de la capacitacion</h3>
-    <table style="margin-top:.75rem;">
+    <div class="table-scroll">
+<table style="margin-top:.75rem;">
       <thead><tr><th>Docente</th><th>Estado</th><th></th></tr></thead>
       <tbody id="tablaDocentesCap"></tbody>
     </table>
+</div>
     <div style="text-align:right;margin-top:1rem;">
       <button class="btn btn-outline" onclick="cerrarModales()"><i class="fa-solid fa-xmark"></i> Cerrar</button>
     </div>
