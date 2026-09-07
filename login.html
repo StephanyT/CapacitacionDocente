@@ -46,10 +46,6 @@
     icono.className = visible ? "fa-regular fa-eye" : "fa-regular fa-eye-slash";
   });
 
-  // Esta carpeta es solo el punto de partida visual para el equipo (sin
-  // datos todavia), asi que el login no valida nada: el toggle elige el rol
-  // y "Acceder" siempre funciona, para que se entienda el flujo sin
-  // necesitar credenciales reales.
   let rolSeleccionado = "docente";
   document.getElementById("btnDocente").addEventListener("click", () => {
     rolSeleccionado = "docente";
