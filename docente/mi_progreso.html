@@ -101,47 +101,132 @@
 <script src="../js/app.js"></script>
 <script>
   const sesion = requireSesion("docente");
-  const docente = DOCENTES.find(d => d.id === sesion.id);
+  const docente = DOCENTES.find(d => d.id === sesion.id) || null;
+  let misInscripcionesReales = [];
+  let resumenProgresoBasico = {
+    pendientes: 0,
+    enCurso: 0,
+    completadas: 0,
+    horas: 0,
+    porcentajeMeta: 0
+  };
 
-  const insignias = insigniasDeDocente(sesion.id);
-  const ganadas = insignias.filter(i => i.ganada).length;
+  async function listarMisInscripcionesBackend(){
+    const respuesta = await fetch("../api/inscripciones/mis_inscripciones.php", {
+      credentials: "same-origin",
+      headers: { "Accept": "application/json" }
+    });
+    let datos = null;
 
-  document.getElementById("tituloProgreso").textContent = `${ganadas} de ${insignias.length} insignias`;
+    try{
+      datos = await respuesta.json();
+    }catch(e){
+      datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+    }
 
-  const porcentaje = Math.round(ganadas / insignias.length * 100);
-  const circunferencia = 314;
-  requestAnimationFrame(() => {
-    document.getElementById("ringProgreso").style.strokeDashoffset = circunferencia - (circunferencia * porcentaje / 100);
-  });
-  animateCount(document.getElementById("porcentajeProgreso"), porcentaje, "%");
+    if(respuesta.status === 401 || respuesta.status === 403){
+      try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+      if(respuesta.status === 401){
+        window.location.replace(rutaLoginCertus());
+      }
+    }
 
-  // Nivel gamificado segun % de insignias ganadas
-  const niveles = [
-    {min:0, nombre:"Explorador", icono:"fa-seedling"},
-    {min:25, nombre:"Practicante", icono:"fa-shoe-prints"},
-    {min:50, nombre:"Especialista", icono:"fa-star-half-stroke"},
-    {min:75, nombre:"Experto", icono:"fa-star"},
-    {min:100, nombre:"Maestro CERTUS", icono:"fa-crown"}
-  ];
-  const nivelActual = [...niveles].reverse().find(n => porcentaje >= n.min);
-  document.getElementById("nivelTag").innerHTML = `<i class="fa-solid ${nivelActual.icono}"></i> Nivel ${niveles.indexOf(nivelActual)+1} · ${nivelActual.nombre}`;
+    if(!respuesta.ok || !datos.ok){
+      const error = new Error(datos.mensaje || "No se pudieron cargar tus inscripciones.");
+      error.status = respuesta.status;
+      throw error;
+    }
 
-  // Horas de desarrollo profesional acumuladas (patron de los registros
-  // estatales de PD en EE. UU.)
-  document.getElementById("horasTag").innerHTML = `<i class="fa-solid fa-hourglass-half"></i> ${horasAcumuladas(sesion.id)} horas de PD acumuladas`;
+    return Array.isArray(datos.inscripciones) ? datos.inscripciones : [];
+  }
 
-  // Meta de horas por periodo (MEJORA — patron de los registros estatales de
-  // PD en EE. UU., que muestran las horas acumuladas contra un minimo
-  // requerido por ciclo de renovacion, no solo el conteo suelto).
-  {
-    const horas = horasAcumuladas(sesion.id);
-    const pct = porcentajeHorasMeta(sesion.id);
-    document.getElementById("horasPeriodo").textContent = planDeDocente(sesion.id).periodo;
-    document.getElementById("horasMetaTexto").textContent = `${horas} / ${META_HORAS_PERIODO} horas`;
-    const barra = document.getElementById("horasMetaBar");
-    barra.style.background = horas >= META_HORAS_PERIODO ? "var(--success)" : "var(--warning)";
+  function normalizarInscripcionReal(inscripcion){
+    const cap = inscripcion.capacitacion || {};
+
+    return {
+      id: parseInt(inscripcion.id, 10),
+      estado: (inscripcion.estado || "").toLowerCase(),
+      fecha_inscripcion: inscripcion.fecha_inscripcion,
+      fecha_limite: inscripcion.fecha_limite,
+      fecha_actualizacion: inscripcion.fecha_actualizacion,
+      capacitacion: {
+        ...cap,
+        id: parseInt(cap.id, 10)
+      }
+    };
+  }
+
+  function duracionHoras(capacitacion){
+    const numero = parseFloat(String((capacitacion && capacitacion.duracion) || "").replace(",", "."));
+    return Number.isFinite(numero) && numero > 0 ? numero : 0;
+  }
+
+  function contarInscripcionesReales(){
+    return misInscripcionesReales.reduce((conteos, inscripcion) => {
+      if(inscripcion.estado === "pendiente") conteos.pendientes++;
+      if(inscripcion.estado === "en curso") conteos.enCurso++;
+      if(inscripcion.estado === "completada") conteos.completadas++;
+      return conteos;
+    }, {pendientes: 0, enCurso: 0, completadas: 0});
+  }
+
+  function calcularResumenProgresoBasico(){
+    const conteos = contarInscripcionesReales();
+    const horas = misInscripcionesReales
+      .filter(i => i.estado === "completada")
+      .reduce((total, i) => total + duracionHoras(i.capacitacion), 0);
+    const meta = Number(META_HORAS_PERIODO) || 0;
+    const porcentajeMeta = meta > 0
+      ? Math.min(100, Math.max(0, Math.round((horas / meta) * 100)))
+      : 0;
+
+    resumenProgresoBasico = {...conteos, horas, porcentajeMeta};
+    return resumenProgresoBasico;
+  }
+
+  function porcentajeInsignias(ganadas, total){
+    if(total <= 0) return 0;
+    const porcentaje = Math.round((ganadas / total) * 100);
+    return Number.isFinite(porcentaje) ? Math.min(100, Math.max(0, porcentaje)) : 0;
+  }
+
+  function renderResumenProgreso(insignias){
+    const totalInsignias = insignias.length;
+    const ganadas = insignias.filter(i => i.ganada).length;
+    const porcentaje = porcentajeInsignias(ganadas, totalInsignias);
+
+    document.getElementById("tituloProgreso").textContent = `${ganadas} de ${totalInsignias} insignias`;
+
+    const circunferencia = 314;
     requestAnimationFrame(() => {
-      barra.style.width = pct + "%";
+      document.getElementById("ringProgreso").style.strokeDashoffset = circunferencia - (circunferencia * porcentaje / 100);
+    });
+    animateCount(document.getElementById("porcentajeProgreso"), porcentaje, "%");
+
+    const niveles = [
+      {min:0, nombre:"Explorador", icono:"fa-seedling"},
+      {min:25, nombre:"Practicante", icono:"fa-shoe-prints"},
+      {min:50, nombre:"Especialista", icono:"fa-star-half-stroke"},
+      {min:75, nombre:"Experto", icono:"fa-star"},
+      {min:100, nombre:"Maestro CERTUS", icono:"fa-crown"}
+    ];
+    const nivelActual = totalInsignias > 0
+      ? [...niveles].reverse().find(n => porcentaje >= n.min)
+      : null;
+
+    document.getElementById("nivelTag").innerHTML = nivelActual
+      ? `<i class="fa-solid ${nivelActual.icono}"></i> Nivel ${niveles.indexOf(nivelActual)+1} · ${nivelActual.nombre}`
+      : `<i class="fa-solid fa-star"></i> Progreso inicial`;
+
+    const resumen = calcularResumenProgresoBasico();
+    document.getElementById("horasTag").innerHTML = `<i class="fa-solid fa-hourglass-half"></i> ${resumen.horas} horas de PD acumuladas`;
+    document.getElementById("horasPeriodo").textContent = planDeDocente(sesion.id).periodo;
+    document.getElementById("horasMetaTexto").textContent = `${resumen.horas} / ${META_HORAS_PERIODO} horas`;
+
+    const barra = document.getElementById("horasMetaBar");
+    barra.style.background = resumen.horas >= META_HORAS_PERIODO ? "var(--success)" : "var(--warning)";
+    requestAnimationFrame(() => {
+      barra.style.width = resumen.porcentajeMeta + "%";
     });
   }
 
@@ -168,7 +253,6 @@
       `;
     }).join("");
   }
-  renderInsignias();
 
   let insigniaEvidenciaActual = null;
   function abrirEvidencia(idInsignia, nombre){
@@ -202,7 +286,6 @@
         `).join("")
       : `<p style="font-size:12.5px;color:var(--text-muted);">Aun no tienes metas — agrega la primera abajo.</p>`;
   }
-  renderPlan();
 
   function toggleMeta(idx){
     const plan = planDeDocente(sesion.id);
@@ -223,13 +306,19 @@
     showToast("Meta agregada a tu plan de desarrollo", "success");
   });
 
-  // La ruta se prioriza segun la especialidad del docente (personalizada, no generica)
-  const pendientes = insignias.filter(i => !i.ganada && i.requiere_capacitacion);
-  const porEspecialidad = pendientes.find(i => i.area === docente.especialidad);
-  const siguiente = porEspecialidad || pendientes[0];
+  function renderRutaRecomendada(insignias){
+    if(!docente) return;
 
-  if(siguiente){
+    // La ruta se prioriza segun la especialidad del docente (personalizada, no generica)
+    const pendientes = insignias.filter(i => !i.ganada && i.requiere_capacitacion);
+    const porEspecialidad = pendientes.find(i => i.area === docente.especialidad);
+    const siguiente = porEspecialidad || pendientes[0];
+
+    if(!siguiente) return;
+
     const cap = CAPACITACIONES.find(c => c.id === siguiente.requiere_capacitacion);
+    if(!cap) return;
+
     const inscRuta = INSCRIPCIONES.find(i => i.id_docente === sesion.id && i.id_capacitacion === cap.id);
     document.getElementById("rutaRecomendada").style.display = "block";
     document.getElementById("rutaEspecialidad").innerHTML =
@@ -249,6 +338,24 @@
     `;
     document.getElementById("rutaBtn").href = inscRuta ? `detalle.html?id=${inscRuta.id}` : "mis_capacitaciones.html";
   }
+
+  async function iniciarProgreso(){
+    try{
+      misInscripcionesReales = (await listarMisInscripcionesBackend()).map(normalizarInscripcionReal);
+    }catch(error){
+      if(error.status === 401) return;
+      misInscripcionesReales = [];
+      showToast(error.message || "No se pudo cargar tu progreso.", "error");
+    }
+
+    const insignias = insigniasDeDocente(sesion.id);
+    renderResumenProgreso(insignias);
+    renderInsignias();
+    renderPlan();
+    renderRutaRecomendada(insignias);
+  }
+
+  iniciarProgreso();
 </script>
 </body>
 </html>
