@@ -45,3 +45,59 @@ CREATE TABLE IF NOT EXISTS capacitaciones (
   KEY idx_capacitaciones_programa (programa),
   KEY idx_capacitaciones_fecha (fecha)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS inscripciones (
+  id INT(11) NOT NULL AUTO_INCREMENT,
+  id_docente INT(11) NOT NULL,
+  id_capacitacion INT(11) NOT NULL,
+  estado ENUM('pendiente', 'en curso', 'completada') NOT NULL DEFAULT 'pendiente',
+  fecha_inscripcion DATE NOT NULL DEFAULT (CURRENT_DATE),
+  fecha_limite DATE DEFAULT NULL,
+  fecha_actualizacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_inscripciones_docente_capacitacion (id_docente, id_capacitacion),
+  KEY idx_inscripciones_docente (id_docente),
+  KEY idx_inscripciones_capacitacion (id_capacitacion),
+  KEY idx_inscripciones_estado (estado),
+  KEY idx_inscripciones_fecha_limite (fecha_limite),
+  CONSTRAINT fk_inscripciones_docente
+    FOREIGN KEY (id_docente) REFERENCES usuarios (id)
+    ON UPDATE CASCADE
+    ON DELETE RESTRICT,
+  CONSTRAINT fk_inscripciones_capacitacion
+    FOREIGN KEY (id_capacitacion) REFERENCES capacitaciones (id)
+    ON UPDATE CASCADE
+    ON DELETE RESTRICT,
+  CONSTRAINT chk_inscripciones_estado
+    CHECK (estado IN ('pendiente', 'en curso', 'completada'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS solicitudes_capacitacion (
+  id INT(11) NOT NULL AUTO_INCREMENT,
+  id_docente INT(11) NOT NULL,
+  id_capacitacion INT(11) NOT NULL,
+  estado ENUM('pendiente', 'aprobada', 'rechazada') NOT NULL DEFAULT 'pendiente',
+  fecha_solicitud DATE NOT NULL DEFAULT (CURRENT_DATE),
+  fecha_resolucion DATE DEFAULT NULL,
+  resuelto_por INT(11) DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_solicitudes_docente_capacitacion (id_docente, id_capacitacion),
+  KEY idx_solicitudes_docente (id_docente),
+  KEY idx_solicitudes_capacitacion (id_capacitacion),
+  KEY idx_solicitudes_estado (estado),
+  KEY idx_solicitudes_resuelto_por (resuelto_por),
+  CONSTRAINT fk_solicitudes_docente
+    FOREIGN KEY (id_docente) REFERENCES usuarios (id)
+    ON UPDATE CASCADE
+    ON DELETE RESTRICT,
+  CONSTRAINT fk_solicitudes_capacitacion
+    FOREIGN KEY (id_capacitacion) REFERENCES capacitaciones (id)
+    ON UPDATE CASCADE
+    ON DELETE RESTRICT,
+  CONSTRAINT fk_solicitudes_resuelto_por
+    FOREIGN KEY (resuelto_por) REFERENCES usuarios (id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL,
+  CONSTRAINT chk_solicitudes_estado
+    CHECK (estado IN ('pendiente', 'aprobada', 'rechazada'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

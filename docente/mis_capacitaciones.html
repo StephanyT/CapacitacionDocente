@@ -83,15 +83,135 @@
 
   let capacitaciones = [];
   let misInscripciones = [];
+  let misSolicitudes = [];
   let disponibles = [];
+  const solicitudesEnProceso = new Set();
 
   function capacitacionPorId(id){
     return capacitaciones.find(c => c.id === id);
   }
 
+  function inscripcionPorId(id){
+    return misInscripciones.find(i => i.id === id);
+  }
+
+  function normalizarInscripcionBackend(inscripcion){
+    const cap = inscripcion.capacitacion || {};
+    const idCapacitacion = parseInt(cap.id, 10);
+
+    return {
+      id: parseInt(inscripcion.id, 10),
+      id_capacitacion: idCapacitacion,
+      estado: inscripcion.estado,
+      fecha_inscripcion: inscripcion.fecha_inscripcion,
+      fecha_limite: inscripcion.fecha_limite || cap.fecha || "",
+      fecha_actualizacion: inscripcion.fecha_actualizacion,
+      capacitacion: {
+        ...cap,
+        id: idCapacitacion
+      }
+    };
+  }
+
+  async function listarMisInscripcionesBackend(){
+    const respuesta = await fetch("../api/inscripciones/mis_inscripciones.php", {
+      credentials: "same-origin",
+      headers: { "Accept": "application/json" }
+    });
+    let datos = null;
+
+    try{
+      datos = await respuesta.json();
+    }catch(e){
+      datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+    }
+
+    if(respuesta.status === 401 || respuesta.status === 403){
+      try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+      if(respuesta.status === 401){
+        window.location.replace(rutaLoginCertus());
+      }
+    }
+
+    if(!respuesta.ok || !datos.ok){
+      throw new Error(datos.mensaje || "No se pudieron cargar tus inscripciones.");
+    }
+
+    return (datos.inscripciones || []).map(normalizarInscripcionBackend);
+  }
+
+  function normalizarSolicitudBackend(solicitud){
+    const cap = solicitud.capacitacion || {};
+    const idCapacitacion = parseInt(cap.id, 10);
+
+    return {
+      id: parseInt(solicitud.id, 10),
+      id_capacitacion: idCapacitacion,
+      estado: solicitud.estado,
+      fecha_solicitud: solicitud.fecha_solicitud,
+      fecha_resolucion: solicitud.fecha_resolucion,
+      capacitacion: {
+        ...cap,
+        id: idCapacitacion
+      }
+    };
+  }
+
+  async function apiSolicitudesDocente(ruta, opciones){
+    const respuesta = await fetch(`../api/solicitudes/${ruta}`, {
+      credentials: "same-origin",
+      headers: { "Accept": "application/json" },
+      ...(opciones || {})
+    });
+    let datos = null;
+
+    try{
+      datos = await respuesta.json();
+    }catch(e){
+      datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+    }
+
+    if(respuesta.status === 401 || respuesta.status === 403){
+      try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+      if(respuesta.status === 401){
+        window.location.replace(rutaLoginCertus());
+      }
+    }
+
+    if(!respuesta.ok || !datos.ok){
+      const error = new Error(datos.mensaje || "No se pudo completar la operacion.");
+      error.status = respuesta.status;
+      throw error;
+    }
+
+    return datos;
+  }
+
+  async function listarMisSolicitudesBackend(){
+    const datos = await apiSolicitudesDocente("mis_solicitudes.php");
+    return (datos.solicitudes || []).map(normalizarSolicitudBackend);
+  }
+
+  async function crearSolicitudBackend(idCapacitacion){
+    const datos = await apiSolicitudesDocente("crear.php", {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ id_capacitacion: idCapacitacion })
+    });
+
+    return normalizarSolicitudBackend(datos.solicitud);
+  }
+
+  function solicitudPorCapacitacion(idCap){
+    return misSolicitudes.find(s => s.id_capacitacion === idCap) || null;
+  }
+
   function render(){
     document.getElementById("listaCapacitaciones").innerHTML = misInscripciones.length ? misInscripciones.map(i => {
-      const cap = capacitacionPorId(i.id_capacitacion);
+      const cap = capacitacionPorId(i.id_capacitacion) || i.capacitacion;
       if(!cap){
         return `<div class="card" data-estado="${i.estado}" style="display:flex;justify-content:space-between;align-items:center;">
           <div>
@@ -103,7 +223,7 @@
       }
       const accion = i.estado === "completada"
         ? `<button class="btn btn-outline btn-sm" onclick="verCompletada(${i.id})"><i class="fa-solid fa-eye"></i> Ver</button>`
-        : `<a href="detalle.html?id=${i.id}" class="btn btn-outline btn-sm"><i class="fa-solid fa-eye"></i> Ver detalle</a>`;
+        : `<a href="detalle.html?capacitacion=${cap.id}" class="btn btn-outline btn-sm"><i class="fa-solid fa-eye"></i> Ver detalle</a>`;
       return `<div class="card" data-estado="${i.estado}" style="display:flex;justify-content:space-between;align-items:center;">
         <div>
           <b>${cap.titulo}</b><br>
@@ -130,10 +250,11 @@
   // Approval" de Frontline Professional Growth / MyLearningPlan, usados en
   // distritos escolares de EEUU) — la inscripcion la crea el admin al aprobar.
   function etiquetaSolicitud(idCap){
-    const s = solicitudDe(sesion.id, idCap);
+    const s = solicitudPorCapacitacion(idCap);
     if(!s) return `<span class="d-tag">No asignada</span>`;
     if(s.estado === "pendiente") return `<span class="d-tag" style="color:var(--warning);border-color:var(--warning);"><i class="fa-solid fa-hourglass-half"></i> Solicitud enviada</span>`;
     if(s.estado === "rechazada") return `<span class="d-tag" style="color:#8a2a1e;border-color:#8a2a1e;">No aprobada</span>`;
+    if(s.estado === "aprobada") return `<span class="d-tag" style="color:var(--success);border-color:var(--success);"><i class="fa-solid fa-circle-check"></i> Solicitud aprobada</span>`;
     return `<span class="d-tag">No asignada</span>`;
   }
 
@@ -152,10 +273,12 @@
   function verDisponible(idCap){
     const cap = capacitacionPorId(idCap);
     if(!cap){ showToast("No se encontro la capacitacion.", "error"); return; }
-    const s = solicitudDe(sesion.id, idCap);
+    const s = solicitudPorCapacitacion(idCap);
     let estadoBox;
     if(s && s.estado === "pendiente"){
       estadoBox = `<div class="requisitos-box" style="margin-bottom:1.25rem;"><i class="fa-solid fa-hourglass-half" style="color:var(--warning);"></i> Ya solicitaste esta capacitacion el ${s.fecha_solicitud}. Un administrador la revisara.</div>`;
+    } else if(s && s.estado === "aprobada"){
+      estadoBox = `<div class="requisitos-box" style="margin-bottom:1.25rem;"><i class="fa-solid fa-circle-check" style="color:var(--success);"></i> Tu solicitud fue aprobada. La inscripcion se reflejara cuando el administrador complete el flujo.</div>`;
     } else if(s && s.estado === "rechazada"){
       estadoBox = `
         <div class="requisitos-box" style="margin-bottom:1.25rem;"><i class="fa-solid fa-circle-info" style="color:#8a2a1e;"></i> Tu solicitud no fue aprobada por ahora. Puedes volver a solicitarla.</div>
@@ -193,11 +316,43 @@
     document.getElementById("modalDisponible").classList.add("open");
   }
 
-  function solicitarCapacitacion(idCap){
-    solicitarCapacitacionLocal(sesion.id, idCap);
-    showToast("Solicitud enviada. Un administrador la revisara.", "success");
-    renderDisponibles();
-    verDisponible(idCap);
+  async function solicitarCapacitacion(idCap){
+    if(solicitudesEnProceso.has(idCap)){
+      showToast("La solicitud ya se esta enviando.", "error");
+      return;
+    }
+
+    if(solicitudPorCapacitacion(idCap)){
+      showToast("Ya existe una solicitud para esta capacitacion.", "error");
+      verDisponible(idCap);
+      return;
+    }
+
+    solicitudesEnProceso.add(idCap);
+
+    try{
+      const solicitud = await crearSolicitudBackend(idCap);
+      misSolicitudes = misSolicitudes.filter(s => s.id_capacitacion !== solicitud.id_capacitacion);
+      misSolicitudes.push(solicitud);
+      showToast("Solicitud enviada. Un administrador la revisara.", "success");
+      renderDisponibles();
+      verDisponible(idCap);
+    }catch(error){
+      if(error.status === 409){
+        showToast(error.message || "Ya existe una solicitud para esta capacitacion.", "error");
+        try{
+          misSolicitudes = await listarMisSolicitudesBackend();
+          renderDisponibles();
+          verDisponible(idCap);
+        }catch(e){}
+      } else if(error.status === 422){
+        showToast(error.message || "Revisa la capacitacion seleccionada.", "error");
+      } else if(error.status !== 401){
+        showToast(error.message || "No se pudo enviar la solicitud.", "error");
+      }
+    }finally{
+      solicitudesEnProceso.delete(idCap);
+    }
   }
 
   document.getElementById("buscador").addEventListener("input", (e) => {
@@ -208,11 +363,11 @@
   });
 
   function verCompletada(idInscripcion){
-    const i = INSCRIPCIONES.find(x => x.id === idInscripcion);
-    const cap = i ? capacitacionPorId(i.id_capacitacion) : null;
+    const i = inscripcionPorId(idInscripcion);
+    const cap = i ? (capacitacionPorId(i.id_capacitacion) || i.capacitacion) : null;
     if(!cap){ showToast("No se encontro la capacitacion.", "error"); return; }
     document.getElementById("modalTexto").textContent = `Completaste "${cap.titulo}". Tu constancia ya esta disponible para descargar.`;
-    document.getElementById("linkDetalleCompletada").href = `detalle.html?id=${i.id}`;
+    document.getElementById("linkDetalleCompletada").href = `detalle.html?capacitacion=${cap.id}`;
     document.getElementById("modalCompletada").classList.add("open");
     if(typeof confetti === "function"){
       confetti({ particleCount: 110, spread: 75, origin: { y: 0.6 }, colors: ["#00205B","#64a44e","#f0ad4e","#008196"] });
@@ -248,7 +403,8 @@
   async function iniciarPagina(){
     try{
       capacitaciones = await listarCapacitacionesBackend();
-      misInscripciones = INSCRIPCIONES.filter(i => i.id_docente === sesion.id);
+      misInscripciones = await listarMisInscripcionesBackend();
+      misSolicitudes = await listarMisSolicitudesBackend();
       actualizarDisponibles();
       render();
       renderDisponibles();

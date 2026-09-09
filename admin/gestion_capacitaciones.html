@@ -105,6 +105,7 @@
 <script>
   const sesion = requireSesion("admin");
   let capacitaciones = [];
+  let solicitudesCapacitacion = [];
 
   function contarDocentes(idCap){
     return INSCRIPCIONES.filter(i => i.id_capacitacion === idCap).length;
@@ -335,39 +336,189 @@
   }
 
   // ===== Solicitudes de acceso a capacitaciones (MEJORA) =====
+  function normalizarSolicitudAdminBackend(solicitud){
+    const docente = solicitud.docente || {};
+    const capacitacion = solicitud.capacitacion || {};
+
+    return {
+      id: parseInt(solicitud.id, 10),
+      estado: solicitud.estado,
+      fecha_solicitud: solicitud.fecha_solicitud,
+      fecha_resolucion: solicitud.fecha_resolucion,
+      docente: {
+        id: parseInt(docente.id, 10),
+        nombres: docente.nombres || "",
+        apellidos: docente.apellidos || "",
+        correo: docente.correo || ""
+      },
+      capacitacion: {
+        id: parseInt(capacitacion.id, 10),
+        titulo: capacitacion.titulo || "Capacitacion eliminada"
+      }
+    };
+  }
+
+  async function listarSolicitudesAdminBackend(){
+    const respuesta = await fetch("../api/solicitudes/listar.php", {
+      credentials: "same-origin",
+      headers: { "Accept": "application/json" }
+    });
+    let datos = null;
+
+    try{
+      datos = await respuesta.json();
+    }catch(e){
+      datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+    }
+
+    if(respuesta.status === 401 || respuesta.status === 403){
+      try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+      if(respuesta.status === 401){
+        window.location.replace(rutaLoginCertus());
+      }
+    }
+
+    if(!respuesta.ok || !datos.ok){
+      throw new Error(datos.mensaje || "No se pudieron cargar las solicitudes.");
+    }
+
+    return (datos.solicitudes || []).map(normalizarSolicitudAdminBackend);
+  }
+
+  async function aprobarSolicitudBackend(idSolicitud){
+    const respuesta = await fetch("../api/solicitudes/aprobar.php", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ id_solicitud: idSolicitud })
+    });
+    let datos = null;
+
+    try{
+      datos = await respuesta.json();
+    }catch(e){
+      datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+    }
+
+    if(respuesta.status === 401 || respuesta.status === 403){
+      try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+      if(respuesta.status === 401){
+        window.location.replace(rutaLoginCertus());
+      }
+    }
+
+    if(!respuesta.ok || !datos.ok){
+      const error = new Error(datos.mensaje || "No se pudo aprobar la solicitud.");
+      error.status = respuesta.status;
+      throw error;
+    }
+
+    return datos;
+  }
+
+  async function rechazarSolicitudBackend(idSolicitud){
+    const respuesta = await fetch("../api/solicitudes/rechazar.php", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ id_solicitud: idSolicitud })
+    });
+    let datos = null;
+
+    try{
+      datos = await respuesta.json();
+    }catch(e){
+      datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+    }
+
+    if(respuesta.status === 401 || respuesta.status === 403){
+      try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+      if(respuesta.status === 401){
+        window.location.replace(rutaLoginCertus());
+      }
+    }
+
+    if(!respuesta.ok || !datos.ok){
+      const error = new Error(datos.mensaje || "No se pudo rechazar la solicitud.");
+      error.status = respuesta.status;
+      throw error;
+    }
+
+    return datos;
+  }
+
   function renderSolicitudes(){
-    const pendientes = todasLasSolicitudesPendientes();
+    const pendientes = solicitudesCapacitacion.filter(s => s.estado === "pendiente");
     const card = document.getElementById("cardSolicitudes");
-    if(pendientes.length === 0){ card.style.display = "none"; return; }
+    if(pendientes.length === 0){
+      card.style.display = "none";
+      document.getElementById("listaSolicitudesAdmin").innerHTML = "";
+      return;
+    }
     card.style.display = "block";
-    document.getElementById("listaSolicitudesAdmin").innerHTML = pendientes.map(s => {
-      const cap = capacitaciones.find(c => c.id === s.id_capacitacion);
-      return `
+    document.getElementById("listaSolicitudesAdmin").innerHTML = pendientes.map(s => `
         <div class="review-item">
           <div class="r-head">
-            <span>${cap ? cap.titulo : "Capacitacion eliminada"} · <span style="font-weight:400;color:var(--text-muted);">${nombreDocente(s.id_docente)}</span></span>
+            <span>${s.capacitacion.titulo} · <span style="font-weight:400;color:var(--text-muted);">${s.docente.nombres} ${s.docente.apellidos}</span></span>
             <span class="badge badge-pendiente">Pendiente</span>
           </div>
-          <p style="font-size:12px;color:var(--text-muted);">Solicitada el ${s.fecha_solicitud}</p>
+          <p style="font-size:12px;color:var(--text-muted);">Solicitada el ${s.fecha_solicitud} · ${s.docente.correo}</p>
           <div style="display:flex;gap:8px;margin-top:6px;">
             <button class="btn btn-primary btn-sm" onclick="aprobarSolicitud(${s.id})"><i class="fa-solid fa-check"></i> Aprobar</button>
             <button class="btn btn-outline btn-sm" onclick="rechazarSolicitud(${s.id})"><i class="fa-solid fa-xmark"></i> Rechazar</button>
           </div>
         </div>
-      `;
-    }).join("");
+      `).join("");
   }
-  function aprobarSolicitud(idSolicitud){
-    const sesion = getSesionActiva();
-    aprobarSolicitudCapacitacion(idSolicitud, (sesion||{}).nombre || "Admin");
-    showToast("Solicitud aprobada. Se creo la inscripcion del docente.", "success");
-    renderSolicitudes();
-    render();
+  async function aprobarSolicitud(idSolicitud){
+    try{
+      await aprobarSolicitudBackend(idSolicitud);
+      solicitudesCapacitacion = await listarSolicitudesAdminBackend();
+      renderSolicitudes();
+      showToast("Solicitud aprobada correctamente. Se creo la inscripcion del docente.", "success");
+    }catch(error){
+      if(error.status === 409){
+        showToast(error.message || "La solicitud ya fue resuelta.", "error");
+        try{
+          solicitudesCapacitacion = await listarSolicitudesAdminBackend();
+          renderSolicitudes();
+        }catch(e){}
+      } else if(error.status === 404){
+        showToast(error.message || "Solicitud no encontrada.", "error");
+      } else if(error.status === 422){
+        showToast(error.message || "Solicitud invalida.", "error");
+      } else if(error.status !== 401){
+        showToast(error.message || "No se pudo aprobar la solicitud.", "error");
+      }
+    }
   }
-  function rechazarSolicitud(idSolicitud){
-    rechazarSolicitudCapacitacion(idSolicitud);
-    showToast("Solicitud rechazada", "success");
-    renderSolicitudes();
+  async function rechazarSolicitud(idSolicitud){
+    try{
+      await rechazarSolicitudBackend(idSolicitud);
+      solicitudesCapacitacion = await listarSolicitudesAdminBackend();
+      renderSolicitudes();
+      showToast("Solicitud rechazada correctamente.", "success");
+    }catch(error){
+      if(error.status === 409){
+        showToast(error.message || "La solicitud ya fue resuelta.", "error");
+        try{
+          solicitudesCapacitacion = await listarSolicitudesAdminBackend();
+          renderSolicitudes();
+        }catch(e){}
+      } else if(error.status === 404){
+        showToast(error.message || "Solicitud no encontrada.", "error");
+      } else if(error.status === 422){
+        showToast(error.message || "Solicitud invalida.", "error");
+      } else if(error.status !== 401){
+        showToast(error.message || "No se pudo rechazar la solicitud.", "error");
+      }
+    }
   }
 
   // ===== Sugerencias de los docentes (MEJORA — needs assessment) =====
@@ -405,6 +556,7 @@
   async function cargarCapacitacionesAdmin(){
     try{
       capacitaciones = await listarCapacitacionesBackend();
+      solicitudesCapacitacion = await listarSolicitudesAdminBackend();
       render();
       renderSolicitudes();
       renderSugerencias();
