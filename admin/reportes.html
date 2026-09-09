@@ -76,8 +76,7 @@
 <script>
   requireSesion("admin");
 
-  document.getElementById("fDocente").innerHTML += DOCENTES.map(d => `<option value="${d.id}">${d.nombres} ${d.apellidos}</option>`).join("");
-
+  let docentesReporte = [];
   let filasActuales = [];
 
   // Paginacion — solo pagina lo que se ve en pantalla;
@@ -90,6 +89,75 @@
     paginaActualReportes = pagina;
     renderTablaReporte();
     window.scrollTo({top: 0, behavior: "smooth"});
+  }
+
+  function escaparHTML(valor){
+    return String(valor ?? "").replace(/[&<>"']/g, caracter => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    }[caracter]));
+  }
+
+  function fechaCorta(fecha){
+    return fecha ? String(fecha).slice(0, 10) : "";
+  }
+
+  function semaforoClaseReporte(registro){
+    if(registro.estado !== "completada" && !registro.fecha_limite) return "semaforo-verde";
+    return semaforoClase(registro);
+  }
+
+  function semaforoTextoReporte(registro){
+    if(registro.estado !== "completada" && !registro.fecha_limite) return "Sin fecha limite";
+    return semaforoTexto(registro);
+  }
+
+  function normalizarRegistroReporte(registro){
+    return {
+      id: parseInt(registro.id_inscripcion, 10),
+      id_docente: parseInt(registro.id_docente, 10),
+      id_capacitacion: parseInt(registro.id_capacitacion, 10),
+      docente: registro.docente || "-",
+      capacitacion: registro.capacitacion || "-",
+      estado: registro.estado || "",
+      fecha_inscripcion: fechaCorta(registro.fecha_inscripcion),
+      fecha_limite: fechaCorta(registro.fecha_limite),
+      fecha_finalizacion: fechaCorta(registro.fecha_finalizacion),
+      sede: registro.sede || "-",
+      programa: registro.programa || "-"
+    };
+  }
+
+  function cargarDocentesReporte(){
+    const select = document.getElementById("fDocente");
+    const seleccionado = select.value || "todas";
+    const opciones = docentesReporte.map(d => {
+      const nombre = `${d.nombres || ""} ${d.apellidos || ""}`.trim();
+      return `<option value="${d.id}">${escaparHTML(nombre)}</option>`;
+    }).join("");
+    select.innerHTML = `<option value="todas">Todos</option>${opciones}`;
+    select.value = docentesReporte.some(d => String(d.id) === String(seleccionado)) ? seleccionado : "todas";
+  }
+
+  function parametrosReporte(){
+    const params = new URLSearchParams();
+    const filtros = [
+      ["sede", document.getElementById("fSede").value],
+      ["programa", document.getElementById("fPrograma").value],
+      ["docente", document.getElementById("fDocente").value],
+      ["estado", document.getElementById("fEstado").value],
+      ["desde", document.getElementById("fDesde").value],
+      ["hasta", document.getElementById("fHasta").value]
+    ];
+
+    filtros.forEach(([clave, valor]) => {
+      if(valor && valor !== "todas") params.set(clave, valor);
+    });
+
+    return params.toString();
   }
 
   function renderPaginacionReportes(totalPaginas){
@@ -117,71 +185,33 @@
     const filas = filasActuales.slice(inicio, inicio + REPORTE_POR_PAGINA);
 
     document.getElementById("tablaReporte").innerHTML = filas.map(i => {
-      const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
-      const fechaFin = i.estado === "completada" ? (i.fecha_actualizacion || i.fecha_limite) : "-";
+      const fechaFin = i.fecha_finalizacion || "-";
       return `<tr>
-        <td><span class="semaforo ${semaforoClase(i)}" title="${semaforoTexto(i)}"></span></td>
-        <td><a href="gestion_docentes.html?docente=${i.id_docente}" style="color:var(--info);">${nombreDocente(i.id_docente)}</a></td>
-        <td>${cap.titulo}</td>
-        <td>${cap.sede}</td>
-        <td>${cap.programa}</td>
-        <td><span class="badge ${badgeClase(i.estado)}">${badgeTexto(i.estado)}</span></td>
-        <td>${i.fecha_inscripcion || "-"}</td>
-        <td>${i.fecha_limite || "-"}</td>
-        <td>${fechaFin}</td>
+        <td><span class="semaforo ${semaforoClaseReporte(i)}" title="${escaparHTML(semaforoTextoReporte(i))}"></span></td>
+        <td><a href="gestion_docentes.html?docente=${i.id_docente}" style="color:var(--info);">${escaparHTML(i.docente)}</a></td>
+        <td>${escaparHTML(i.capacitacion)}</td>
+        <td>${escaparHTML(i.sede)}</td>
+        <td>${escaparHTML(i.programa)}</td>
+        <td><span class="badge ${badgeClase(i.estado)}">${escaparHTML(badgeTexto(i.estado))}</span></td>
+        <td>${escaparHTML(i.fecha_inscripcion || "-")}</td>
+        <td>${escaparHTML(i.fecha_limite || "-")}</td>
+        <td>${escaparHTML(fechaFin)}</td>
       </tr>`;
-    }).join("") || `<tr><td colspan="9" style="text-align:center;color:#6a737b;">Sin resultados</td></tr>`;
+    }).join("") || `<tr><td colspan="9" style="text-align:center;color:#6a737b;">No hay registros para mostrar</td></tr>`;
 
     renderPaginacionReportes(totalPaginas);
   }
 
   function render(){
-    const sede = document.getElementById("fSede").value;
-    const programa = document.getElementById("fPrograma").value;
-    const docente = document.getElementById("fDocente").value;
-    const estado = document.getElementById("fEstado").value;
-    const desde = document.getElementById("fDesde").value;
-    const hasta = document.getElementById("fHasta").value;
-
-    const filas = INSCRIPCIONES.filter(i => {
-      const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
-      if(sede !== "todas" && cap.sede !== sede) return false;
-      if(programa !== "todas" && cap.programa !== programa) return false;
-      if(docente !== "todas" && i.id_docente !== parseInt(docente)) return false;
-      if(estado !== "todas" && i.estado !== estado) return false;
-      // RF-17: filtro por periodo, sobre la columna "Fecha de finalizacion".
-      // Esa columna solo tiene un valor real quando la inscripcion esta
-      // completada (fecha_actualizacion); en pendiente/en curso se muestra
-      // "-" porque aun no hay fecha de finalizacion. Por eso, si el filtro
-      // de periodo esta activo, esas filas sin fecha real quedan fuera —
-      // antes se colaban usando fecha_limite como reemplazo, lo cual no
-      // coincidia con lo que se veia en pantalla.
-      if(desde || hasta){
-        if(i.estado !== "completada") return false;
-        const fechaFinalizacion = i.fecha_actualizacion || i.fecha_limite;
-        if(desde && fechaFinalizacion < desde) return false;
-        if(hasta && fechaFinalizacion > hasta) return false;
-      }
-      return true;
-    });
-
-    // Columna de semaforo + las 3 fechas del ciclo de vida (RF-17/RF-18): antes
-    // el reporte solo mostraba limite y finalizacion, saltandose el inicio —
-    // sin la fecha de inscripcion no se podia leer el recorrido completo
-    // (inicio -> limite -> finalizacion) de un vistazo. Tampoco tenia ninguna
-    // senial de urgencia, aunque el semaforo ya existe en Dashboard y en el
-    // perfil del docente.
-    filasActuales = filas;
     paginaActualReportes = 1;
     renderTablaReporte();
   }
-  render();
-  ["fSede","fPrograma","fDocente","fEstado","fDesde","fHasta"].forEach(id => document.getElementById(id).addEventListener("change", render));
+  ["fSede","fPrograma","fDocente","fEstado","fDesde","fHasta"].forEach(id => document.getElementById(id).addEventListener("change", cargarReporte));
 
   function limpiarPeriodo(){
     document.getElementById("fDesde").value = "";
     document.getElementById("fHasta").value = "";
-    render();
+    cargarReporte();
   }
 
   // RF-18: exportacion real del reporte filtrado (no simulada) — genera un
@@ -193,9 +223,8 @@
     }
     const encabezado = ["Docente","Capacitacion","Sede","Programa","Estado","Cumplimiento","Fecha de inicio","Fecha limite","Fecha de finalizacion"];
     const filasCSV = filasActuales.map(i => {
-      const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
-      const fechaFin = i.estado === "completada" ? (i.fecha_actualizacion || i.fecha_limite) : "-";
-      return [nombreDocente(i.id_docente), cap.titulo, cap.sede, cap.programa, badgeTexto(i.estado), semaforoTexto(i), i.fecha_inscripcion || "-", i.fecha_limite || "-", fechaFin];
+      const fechaFin = i.fecha_finalizacion || "-";
+      return [i.docente, i.capacitacion, i.sede, i.programa, badgeTexto(i.estado), semaforoTextoReporte(i), i.fecha_inscripcion || "-", i.fecha_limite || "-", fechaFin];
     });
     const escapar = (v) => `"${String(v).replace(/"/g, '""')}"`;
     const csv = [encabezado, ...filasCSV].map(fila => fila.map(escapar).join(",")).join("\r\n");
@@ -211,6 +240,47 @@
     showToast(`Reporte exportado (${filasActuales.length} filas)`, "success");
   }
   document.getElementById("btnExportarReporte").addEventListener("click", exportarCSV);
+
+  async function cargarReporte(){
+    try{
+      const query = parametrosReporte();
+      const respuesta = await fetch(`../api/reportes/general.php${query ? `?${query}` : ""}`, {
+        credentials: "same-origin",
+        headers: { "Accept": "application/json" }
+      });
+
+      let datos = null;
+      try{
+        datos = await respuesta.json();
+      }catch(e){
+        datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+      }
+
+      if(respuesta.status === 401 || respuesta.status === 403){
+        try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+        if(respuesta.status === 401){
+          window.location.replace(rutaLoginCertus());
+          return;
+        }
+      }
+
+      if(!respuesta.ok || !datos.ok){
+        throw new Error(datos.mensaje || "No se pudo cargar el reporte.");
+      }
+
+      docentesReporte = datos.docentes || [];
+      filasActuales = (datos.registros || []).map(normalizarRegistroReporte);
+      cargarDocentesReporte();
+      render();
+    }catch(error){
+      console.error(error);
+      filasActuales = [];
+      renderTablaReporte();
+      showToast(error.message || "No se pudo cargar el reporte.", "error");
+    }
+  }
+
+  cargarReporte();
 </script>
 </body>
 </html>
