@@ -72,6 +72,15 @@ CREATE TABLE `inscripciones` (
   `fecha_actualizacion` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ;
 
+--
+-- Volcado de datos para la tabla `inscripciones`
+--
+
+INSERT INTO `inscripciones` (`id`, `id_docente`, `id_capacitacion`, `estado`, `fecha_inscripcion`, `fecha_limite`, `fecha_actualizacion`) VALUES
+(1, 1, 1, 'completada', '2026-09-01', '2026-09-18', '2026-09-18 17:00:00'),
+(2, 1, 2, 'en curso', '2026-09-05', '2026-09-25', '2026-09-10 09:00:00'),
+(3, 1, 3, 'pendiente', '2026-09-08', '2026-10-02', '2026-09-08 09:00:00');
+
 -- --------------------------------------------------------
 
 --
@@ -174,7 +183,7 @@ ALTER TABLE `capacitaciones`
 -- AUTO_INCREMENT de la tabla `inscripciones`
 --
 ALTER TABLE `inscripciones`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT de la tabla `solicitudes_capacitacion`

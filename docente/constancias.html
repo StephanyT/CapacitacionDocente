@@ -40,56 +40,114 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="../js/data.js"></script>
 <script src="../js/app.js"></script>
 <script>
   const sesion = requireSesion("docente");
-  const docente = DOCENTES.find(d => d.id === sesion.id);
+  let constancias = [];
+  const listaConstancias = document.getElementById("listaConstancias");
 
-  const misInscripcionesCompletadas = INSCRIPCIONES.filter(i => i.id_docente === sesion.id && i.estado === "completada");
-
-  if(misInscripcionesCompletadas.length === 0){
-    document.getElementById("listaConstancias").innerHTML = `
-      <div class="card" style="text-align:center;padding:2.5rem 1rem;grid-column:1/-1;">
-        <i class="fa-solid fa-certificate" style="font-size:34px;color:var(--secondary);margin-bottom:.75rem;display:block;"></i>
-        <p style="font-size:13px;color:var(--text-muted);">Aun no tienes constancias. Se generan automaticamente al completar una capacitacion.</p>
-      </div>`;
+  function escaparHTML(valor){
+    return String(valor ?? "").replace(/[&<>"']/g, caracter => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    }[caracter]));
   }
 
-  document.getElementById("listaConstancias").innerHTML = misInscripcionesCompletadas.map((i, idx) => {
-    const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
-    const constancia = CONSTANCIAS.find(c => c.id_inscripcion === i.id) || {codigo:"CERTUS-PENDIENTE", fecha_emision:"-"};
-    return `
-      <div class="constancia-preview" style="animation-delay:${idx * .06}s;" onclick="abrirConstancia(${i.id})">
+  function fechaCorta(fecha){
+    return fecha ? String(fecha).slice(0, 10) : "-";
+  }
+
+  function obtenerConstancia(idInscripcion){
+    return constancias.find(c => c.id_inscripcion === idInscripcion);
+  }
+
+  async function apiConstancias(ruta){
+    const respuesta = await fetch(`../api/constancias/${ruta}`, {
+      credentials: "same-origin",
+      headers: { "Accept": "application/json" }
+    });
+
+    let datos = null;
+    try{
+      datos = await respuesta.json();
+    }catch(e){
+      datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+    }
+
+    if(respuesta.status === 401 || respuesta.status === 403){
+      try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+      window.location.replace(rutaLoginCertus());
+      throw new Error("Sesion no valida.");
+    }
+
+    if(!respuesta.ok || !datos.ok){
+      throw new Error(datos.mensaje || "No se pudo completar la operacion.");
+    }
+
+    return datos;
+  }
+
+  function renderConstancias(){
+    if(constancias.length === 0){
+      listaConstancias.innerHTML = `
+        <div class="card" style="text-align:center;padding:2.5rem 1rem;grid-column:1/-1;">
+          <i class="fa-solid fa-certificate" style="font-size:34px;color:var(--secondary);margin-bottom:.75rem;display:block;"></i>
+          <p style="font-size:13px;color:var(--text-muted);">Aun no tienes constancias. Se generan automaticamente al completar una capacitacion.</p>
+        </div>`;
+      return;
+    }
+
+    listaConstancias.innerHTML = constancias.map((constancia, idx) => `
+      <div class="constancia-preview" style="animation-delay:${idx * .06}s;" onclick="abrirConstancia(${constancia.id_inscripcion})">
         <div class="ribbon"><i class="fa-solid fa-award"></i></div>
-        <b>${cap.titulo}</b>
-        <span class="fecha">Emitida el ${constancia.fecha_emision}</span>
-        <span class="codigo">${constancia.codigo}</span>
+        <b>${escaparHTML(constancia.capacitacion)}</b>
+        <span class="fecha">Finalizada el ${escaparHTML(fechaCorta(constancia.fecha_finalizacion))}</span>
+        <span class="codigo">${escaparHTML(constancia.codigo)}</span>
         <span class="hint"><i class="fa-solid fa-eye"></i> Ver constancia</span>
+        <button class="btn btn-primary btn-sm" style="margin-top:.75rem;" onclick="event.stopPropagation();descargarPDF(${constancia.id_inscripcion})"><i class="fa-solid fa-download"></i> Descargar PDF</button>
       </div>
-    `;
-  }).join("");
+    `).join("");
+  }
+
+  async function cargarConstancias(){
+    try{
+      const datos = await apiConstancias("mis_constancias.php");
+      constancias = datos.constancias || [];
+      renderConstancias();
+    }catch(error){
+      console.error(error);
+      listaConstancias.innerHTML = `
+        <div class="card" style="text-align:center;padding:2.5rem 1rem;grid-column:1/-1;">
+          <i class="fa-solid fa-triangle-exclamation" style="font-size:30px;color:var(--danger);margin-bottom:.75rem;display:block;"></i>
+          <p style="font-size:13px;color:var(--text-muted);">${escaparHTML(error.message || "No se pudieron cargar las constancias.")}</p>
+        </div>`;
+    }
+  }
 
   function abrirConstancia(idInscripcion){
-    const i = INSCRIPCIONES.find(x => x.id === idInscripcion);
-    const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
-    const constancia = CONSTANCIAS.find(c => c.id_inscripcion === i.id) || {codigo:"CERTUS-PENDIENTE", fecha_emision:"-"};
+    const constancia = obtenerConstancia(idInscripcion);
+    if(!constancia){
+      showToast("Constancia no disponible", "error");
+      return;
+    }
 
     document.getElementById("diplomaModalBox").innerHTML = `
       <div class="diploma">
         <div class="diploma-head">
           <div class="diploma-brandmark"><span class="diploma-logo-chip"><img src="../img/certus_logo.png" alt="CERTUS"></span></div>
           <span class="diploma-tag">Constancia de finalizacion</span>
-          <div class="diploma-nombre">${docente.nombres} ${docente.apellidos}</div>
+          <div class="diploma-nombre">${escaparHTML(constancia.docente)}</div>
           <p class="diploma-sub">Ha completado satisfactoriamente el programa de capacitacion docente detallado a continuacion, cumpliendo con los requisitos academicos establecidos por CERTUS.</p>
         </div>
-        <div class="diploma-titulo">"${cap.titulo}"</div>
+        <div class="diploma-titulo">"${escaparHTML(constancia.capacitacion)}"</div>
         <div class="diploma-meta">
-          <div><span>Duracion</span><b>${cap.duracion}</b></div>
-          <div><span>Sede</span><b>${cap.sede}</b></div>
-          <div><span>Emitida el</span><b>${constancia.fecha_emision}</b></div>
+          <div><span>Duracion</span><b>${escaparHTML(constancia.duracion)}</b></div>
+          <div><span>Sede</span><b>${escaparHTML(constancia.sede)}</b></div>
+          <div><span>Finalizada el</span><b>${escaparHTML(fechaCorta(constancia.fecha_finalizacion))}</b></div>
         </div>
         <div class="diploma-footer">
           <div class="diploma-firma">
@@ -129,53 +187,58 @@
     if(e.target.id === "modalDiploma") cerrarDiploma();
   });
 
-  // RF-14: descarga real de la constancia en PDF (no simulada), generada
-  // en el navegador a partir del propio diseno del diploma (html2canvas + jsPDF).
   async function descargarPDF(idInscripcion){
-    const i = INSCRIPCIONES.find(x => x.id === idInscripcion);
-    const constancia = CONSTANCIAS.find(c => c.id_inscripcion === i.id) || {codigo:"CERTUS-PENDIENTE"};
-    const el = document.querySelector("#diplomaModalBox .diploma");
+    const constancia = obtenerConstancia(idInscripcion);
     const btn = document.getElementById("btnDescargarPDF");
-    if(!el || typeof html2canvas === "undefined" || !window.jspdf){
-      showToast("No se pudo generar el PDF en este navegador", "error");
+    if(!constancia){
+      showToast("Constancia no disponible", "error");
       return;
     }
 
-    const original = btn.innerHTML;
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Generando...`;
-    btn.disabled = true;
-
-    // BUG real encontrado: el diploma tiene "animation: slideUp .4s ease
-    // backwards" (efecto de aparicion). Si la captura se hacia antes de que
-    // esa animacion terminara, html2canvas congelaba el diploma a mitad de
-    // camino (opacidad parcial), y el PDF salia con todos los colores
-    // lavados/palidos en vez de los reales. Se apaga la animacion antes de
-    // capturar para que el diploma quede siempre en su estado final.
-    const animacionOriginal = el.style.animation;
-    el.style.animation = "none";
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-    await new Promise(r => setTimeout(r, 80));
+    const original = btn ? btn.innerHTML : "";
+    if(btn){
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Generando...`;
+      btn.disabled = true;
+    }
 
     try{
-      const canvas = await html2canvas(el, { scale: 2, backgroundColor: "#ffffff" });
-      const imgData = canvas.toDataURL("image/png");
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({
-        orientation: canvas.width >= canvas.height ? "landscape" : "portrait",
-        unit: "px",
-        format: [canvas.width, canvas.height]
+      const respuesta = await fetch(`../api/constancias/descargar.php?id_inscripcion=${encodeURIComponent(idInscripcion)}`, {
+        credentials: "same-origin"
       });
-      pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
-      pdf.save(`constancia-${constancia.codigo}.pdf`);
+
+      if(respuesta.status === 401 || respuesta.status === 403){
+        try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+        window.location.replace(rutaLoginCertus());
+        return;
+      }
+
+      if(!respuesta.ok){
+        let datos = null;
+        try{ datos = await respuesta.json(); }catch(e){}
+        throw new Error((datos && datos.mensaje) || "No se pudo descargar la constancia.");
+      }
+
+      const blob = await respuesta.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `constancia-${constancia.codigo}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
       showToast("PDF descargado correctamente", "success");
     } catch(err){
-      showToast("Ocurrio un error generando el PDF", "error");
+      showToast(err.message || "Ocurrio un error generando el PDF", "error");
     } finally {
-      el.style.animation = animacionOriginal;
-      btn.innerHTML = original;
-      btn.disabled = false;
+      if(btn){
+        btn.innerHTML = original;
+        btn.disabled = false;
+      }
     }
   }
+
+  cargarConstancias();
 </script>
 </body>
 </html>

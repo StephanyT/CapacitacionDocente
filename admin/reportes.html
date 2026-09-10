@@ -30,7 +30,10 @@
   <main class="main">
     <div class="topbar">
       <h1>Reportes</h1>
-      <button class="btn btn-outline" id="btnExportarReporte"><i class="fa-solid fa-file-export"></i> Exportar CSV</button>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+        <button class="btn btn-outline" id="btnExportarReporte"><i class="fa-solid fa-file-export"></i> Exportar CSV</button>
+        <button class="btn btn-primary" id="btnDescargarReportePDF"><i class="fa-solid fa-file-pdf"></i> Descargar PDF</button>
+      </div>
     </div>
 
     <div class="card">
@@ -240,6 +243,51 @@
     showToast(`Reporte exportado (${filasActuales.length} filas)`, "success");
   }
   document.getElementById("btnExportarReporte").addEventListener("click", exportarCSV);
+
+  async function descargarPDFReporte(){
+    const btn = document.getElementById("btnDescargarReportePDF");
+    const original = btn.innerHTML;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Generando...`;
+    btn.disabled = true;
+
+    try{
+      const query = parametrosReporte();
+      const respuesta = await fetch(`../api/reportes/pdf.php${query ? `?${query}` : ""}`, {
+        credentials: "same-origin"
+      });
+
+      if(respuesta.status === 401 || respuesta.status === 403){
+        try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+        if(respuesta.status === 401){
+          window.location.replace(rutaLoginCertus());
+          return;
+        }
+      }
+
+      if(!respuesta.ok){
+        let datos = null;
+        try{ datos = await respuesta.json(); }catch(e){}
+        throw new Error((datos && datos.mensaje) || "No se pudo generar el PDF.");
+      }
+
+      const blob = await respuesta.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reporte-capacitaciones-docentes-${new Date().toISOString().slice(0,10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast("PDF descargado correctamente", "success");
+    }catch(error){
+      showToast(error.message || "No se pudo generar el PDF.", "error");
+    }finally{
+      btn.innerHTML = original;
+      btn.disabled = false;
+    }
+  }
+  document.getElementById("btnDescargarReportePDF").addEventListener("click", descargarPDFReporte);
 
   async function cargarReporte(){
     try{
