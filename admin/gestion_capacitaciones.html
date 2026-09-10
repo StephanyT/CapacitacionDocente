@@ -105,10 +105,102 @@
 <script>
   const sesion = requireSesion("admin");
   let capacitaciones = [];
+  let inscripcionesAdmin = [];
   let solicitudesCapacitacion = [];
+  let idCapacitacionDocentesAbierta = null;
 
   function contarDocentes(idCap){
-    return INSCRIPCIONES.filter(i => i.id_capacitacion === idCap).length;
+    return inscripcionesAdmin.filter(i => i.id_capacitacion === idCap).length;
+  }
+
+  function escaparHTMLGestion(valor){
+    return String(valor ?? "").replace(/[&<>"']/g, c => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;"
+    })[c]);
+  }
+
+  function normalizarInscripcionAdminBackend(inscripcion){
+    const docente = inscripcion.docente || {};
+    const capacitacion = inscripcion.capacitacion || {};
+
+    return {
+      id: parseInt(inscripcion.id, 10),
+      estado: inscripcion.estado || "pendiente",
+      fecha_inscripcion: inscripcion.fecha_inscripcion,
+      fecha_limite: inscripcion.fecha_limite,
+      fecha_actualizacion: inscripcion.fecha_actualizacion,
+      id_docente: parseInt(docente.id, 10),
+      id_capacitacion: parseInt(capacitacion.id, 10),
+      docente: {
+        id: parseInt(docente.id, 10),
+        nombres: docente.nombres || "",
+        apellidos: docente.apellidos || "",
+        correo: docente.correo || ""
+      },
+      capacitacion: {
+        id: parseInt(capacitacion.id, 10),
+        titulo: capacitacion.titulo || ""
+      }
+    };
+  }
+
+  async function apiInscripciones(ruta, opciones){
+    const config = {
+      credentials: "same-origin",
+      headers: { "Accept": "application/json" },
+      ...(opciones || {})
+    };
+
+    if(config.body && !(config.body instanceof FormData)){
+      config.headers = {
+        ...config.headers,
+        "Content-Type": "application/json"
+      };
+      if(typeof config.body !== "string"){
+        config.body = JSON.stringify(config.body);
+      }
+    }
+
+    const respuesta = await fetch(`../api/inscripciones/${ruta}`, config);
+    let datos = null;
+
+    try{
+      datos = await respuesta.json();
+    }catch(e){
+      datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+    }
+
+    if(respuesta.status === 401 || respuesta.status === 403){
+      try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+      if(respuesta.status === 401){
+        window.location.replace(rutaLoginCertus());
+      }
+    }
+
+    if(!respuesta.ok || !datos.ok){
+      const error = new Error(datos.mensaje || "No se pudo completar la operacion.");
+      error.status = respuesta.status;
+      throw error;
+    }
+
+    return datos;
+  }
+
+  async function listarInscripcionesAdminBackend(){
+    const datos = await apiInscripciones("listar.php");
+    return (datos.inscripciones || []).map(normalizarInscripcionAdminBackend);
+  }
+
+  async function cambiarEstadoInscripcionBackend(idInscripcion, estado){
+    const datos = await apiInscripciones("cambiar_estado.php", {
+      method: "POST",
+      body: {id_inscripcion: idInscripcion, estado}
+    });
+    return normalizarInscripcionAdminBackend(datos.inscripcion);
   }
 
   // Paginacion — mismo patron que gestion_docentes.html.
@@ -282,25 +374,26 @@
   function abrirDocentes(idCap){
     const cap = capacitaciones.find(c => c.id === idCap);
     if(!cap){ showToast("No se encontro la capacitacion.", "error"); return; }
+    idCapacitacionDocentesAbierta = idCap;
     document.getElementById("tituloModalDocentes").textContent = "Docentes de: " + cap.titulo;
-    const inscritos = INSCRIPCIONES.filter(i => i.id_capacitacion === idCap);
-    document.getElementById("tablaDocentesCap").innerHTML = inscritos.map(i => `
+    const inscritos = inscripcionesAdmin.filter(i => i.id_capacitacion === idCap);
+    document.getElementById("tablaDocentesCap").innerHTML = inscritos.length ? inscritos.map(i => `
       <tr>
-        <td>${nombreDocente(i.id_docente)}</td>
+        <td>${escaparHTMLGestion(`${i.docente.nombres} ${i.docente.apellidos}`.trim() || "-")}</td>
         <td><span class="badge ${badgeClase(i.estado)}">${badgeTexto(i.estado)}</span></td>
         <td>
-          <select onchange="actualizarEstadoInscripcion(${i.id}, this.value, ${idCap})" style="font-size:12px;padding:4px;">
+          <select onchange="actualizarEstadoInscripcion(${i.id}, this.value, ${idCap}, this)" style="font-size:12px;padding:4px;">
             <option value="pendiente" ${i.estado==="pendiente"?"selected":""}>Pendiente</option>
             <option value="en curso" ${i.estado==="en curso"?"selected":""}>En curso</option>
             <option value="completada" ${i.estado==="completada"?"selected":""}>Completada</option>
           </select>
         </td>
       </tr>
-    `).join("");
+    `).join("") : `<tr><td colspan="3" style="text-align:center;color:var(--text-muted);">No hay docentes inscritos en esta capacitacion.</td></tr>`;
     document.getElementById("modalDocentes").classList.add("open");
   }
 
-  function actualizarEstadoInscripcion(idInscripcion, nuevoEstado, idCap){
+  function actualizarEstadoInscripcionMockAnterior(idInscripcion, nuevoEstado, idCap){
     const insc = INSCRIPCIONES.find(x => x.id === idInscripcion);
     if(!insc) return;
     insc.estado = nuevoEstado;
@@ -329,9 +422,38 @@
     if(idCap) abrirDocentes(idCap);
   }
 
+  async function actualizarEstadoInscripcion(idInscripcion, nuevoEstado, idCap, control){
+    const insc = inscripcionesAdmin.find(x => x.id === idInscripcion);
+    if(!insc) return;
+    const estadoAnterior = insc.estado;
+    if(control) control.disabled = true;
+
+    try{
+      const actualizada = await cambiarEstadoInscripcionBackend(idInscripcion, nuevoEstado);
+      const indice = inscripcionesAdmin.findIndex(x => x.id === idInscripcion);
+      if(indice >= 0) inscripcionesAdmin[indice] = actualizada;
+      inscripcionesAdmin = await listarInscripcionesAdminBackend();
+      render();
+      if(idCap) abrirDocentes(idCap);
+      showToast(
+        nuevoEstado === "completada"
+          ? `Estado actualizado a "${badgeTexto(nuevoEstado)}". La constancia queda disponible para el docente.`
+          : `Estado actualizado a "${badgeTexto(nuevoEstado)}".`,
+        "success"
+      );
+    }catch(error){
+      if(control){
+        control.value = estadoAnterior;
+        control.disabled = false;
+      }
+      showToast(error.message || "No se pudo actualizar la inscripcion.", "error");
+    }
+  }
+
   function cerrarModales(){
     document.getElementById("modalForm").classList.remove("open");
     document.getElementById("modalDocentes").classList.remove("open");
+    idCapacitacionDocentesAbierta = null;
     render();
   }
 
@@ -480,6 +602,8 @@
     try{
       await aprobarSolicitudBackend(idSolicitud);
       solicitudesCapacitacion = await listarSolicitudesAdminBackend();
+      inscripcionesAdmin = await listarInscripcionesAdminBackend();
+      render();
       renderSolicitudes();
       showToast("Solicitud aprobada correctamente. Se creo la inscripcion del docente.", "success");
     }catch(error){
@@ -556,6 +680,7 @@
   async function cargarCapacitacionesAdmin(){
     try{
       capacitaciones = await listarCapacitacionesBackend();
+      inscripcionesAdmin = await listarInscripcionesAdminBackend();
       solicitudesCapacitacion = await listarSolicitudesAdminBackend();
       render();
       renderSolicitudes();
