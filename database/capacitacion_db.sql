@@ -84,6 +84,50 @@ INSERT INTO `inscripciones` (`id`, `id_docente`, `id_capacitacion`, `estado`, `f
 -- --------------------------------------------------------
 
 --
+-- Estructura de tabla para la tabla `insignias`
+--
+
+CREATE TABLE `insignias` (
+  `id` int(11) NOT NULL,
+  `nombre` varchar(120) NOT NULL,
+  `codigo_icono` varchar(20) NOT NULL,
+  `requisito` varchar(255) DEFAULT NULL,
+  `area` varchar(100) DEFAULT NULL,
+  `id_capacitacion_requerida` int(11) DEFAULT NULL,
+  `requiere_evidencia` tinyint(1) NOT NULL DEFAULT 0,
+  `activo` tinyint(1) NOT NULL DEFAULT 1,
+  `fecha_creacion` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Volcado de datos para la tabla `insignias`
+--
+
+INSERT INTO `insignias` (`id`, `nombre`, `codigo_icono`, `requisito`, `area`, `id_capacitacion_requerida`, `requiere_evidencia`, `activo`, `fecha_creacion`) VALUES
+(1, 'Programacion web aplicada', 'AD', 'Completar la capacitacion Estrategias de programacion web en el aula.', 'Desarrollo de Software', 1, 0, 1, '2026-09-10 00:00:00'),
+(2, 'Evidencia de practica web', 'CC', 'Completar la capacitacion Estrategias de programacion web en el aula y enviar una evidencia aprobada.', 'Desarrollo de Software', 1, 1, 1, '2026-09-10 00:00:00'),
+(3, 'IA educativa responsable', 'IA', 'Completar la capacitacion Herramientas de IA para la practica docente.', 'Marketing', 3, 0, 1, '2026-09-10 00:00:00');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `evidencias_insignia`
+--
+
+CREATE TABLE `evidencias_insignia` (
+  `id` int(11) NOT NULL,
+  `id_docente` int(11) NOT NULL,
+  `id_insignia` int(11) NOT NULL,
+  `texto` text NOT NULL,
+  `estado` enum('pendiente','aprobada','rechazada') NOT NULL DEFAULT 'pendiente',
+  `fecha_envio` timestamp NOT NULL DEFAULT current_timestamp(),
+  `fecha_revision` timestamp NULL DEFAULT NULL,
+  `revisado_por` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Estructura de tabla para la tabla `solicitudes_capacitacion`
 --
 
@@ -152,6 +196,24 @@ ALTER TABLE `inscripciones`
   ADD KEY `idx_inscripciones_fecha_limite` (`fecha_limite`);
 
 --
+-- Indices de la tabla `insignias`
+--
+ALTER TABLE `insignias`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_insignias_capacitacion` (`id_capacitacion_requerida`),
+  ADD KEY `idx_insignias_activo` (`activo`);
+
+--
+-- Indices de la tabla `evidencias_insignia`
+--
+ALTER TABLE `evidencias_insignia`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_evidencias_docente` (`id_docente`),
+  ADD KEY `idx_evidencias_insignia` (`id_insignia`),
+  ADD KEY `idx_evidencias_estado` (`estado`),
+  ADD KEY `idx_evidencias_revisado_por` (`revisado_por`);
+
+--
 -- Indices de la tabla `solicitudes_capacitacion`
 --
 ALTER TABLE `solicitudes_capacitacion`
@@ -186,6 +248,18 @@ ALTER TABLE `inscripciones`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
+-- AUTO_INCREMENT de la tabla `insignias`
+--
+ALTER TABLE `insignias`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT de la tabla `evidencias_insignia`
+--
+ALTER TABLE `evidencias_insignia`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT de la tabla `solicitudes_capacitacion`
 --
 ALTER TABLE `solicitudes_capacitacion`
@@ -207,6 +281,20 @@ ALTER TABLE `usuarios`
 ALTER TABLE `inscripciones`
   ADD CONSTRAINT `fk_inscripciones_capacitacion` FOREIGN KEY (`id_capacitacion`) REFERENCES `capacitaciones` (`id`) ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_inscripciones_docente` FOREIGN KEY (`id_docente`) REFERENCES `usuarios` (`id`) ON UPDATE CASCADE;
+
+--
+-- Filtros para la tabla `insignias`
+--
+ALTER TABLE `insignias`
+  ADD CONSTRAINT `fk_insignias_capacitacion` FOREIGN KEY (`id_capacitacion_requerida`) REFERENCES `capacitaciones` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+--
+-- Filtros para la tabla `evidencias_insignia`
+--
+ALTER TABLE `evidencias_insignia`
+  ADD CONSTRAINT `fk_evidencias_docente` FOREIGN KEY (`id_docente`) REFERENCES `usuarios` (`id`) ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_evidencias_insignia` FOREIGN KEY (`id_insignia`) REFERENCES `insignias` (`id`) ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_evidencias_revisado_por` FOREIGN KEY (`revisado_por`) REFERENCES `usuarios` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 --
 -- Filtros para la tabla `solicitudes_capacitacion`

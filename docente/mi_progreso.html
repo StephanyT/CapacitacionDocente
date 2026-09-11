@@ -103,6 +103,8 @@
   const sesion = requireSesion("docente");
   const docente = DOCENTES.find(d => d.id === sesion.id) || null;
   let misInscripcionesReales = [];
+  let misInsigniasReales = [];
+  let misEvidenciasReales = [];
   let resumenProgresoBasico = {
     pendientes: 0,
     enCurso: 0,
@@ -140,6 +142,101 @@
     return Array.isArray(datos.inscripciones) ? datos.inscripciones : [];
   }
 
+  async function listarMisInsigniasBackend(){
+    const respuesta = await fetch("../api/insignias/mis_insignias.php", {
+      credentials: "same-origin",
+      headers: { "Accept": "application/json" }
+    });
+    let datos = null;
+
+    try{
+      datos = await respuesta.json();
+    }catch(e){
+      datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+    }
+
+    if(respuesta.status === 401 || respuesta.status === 403){
+      try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+      if(respuesta.status === 401){
+        window.location.replace(rutaLoginCertus());
+      }
+    }
+
+    if(!respuesta.ok || !datos.ok){
+      const error = new Error(datos.mensaje || "No se pudieron cargar tus insignias.");
+      error.status = respuesta.status;
+      throw error;
+    }
+
+    return Array.isArray(datos.insignias) ? datos.insignias : [];
+  }
+
+  async function listarMisEvidenciasBackend(){
+    const respuesta = await fetch("../api/evidencias/mis_evidencias.php", {
+      credentials: "same-origin",
+      headers: { "Accept": "application/json" }
+    });
+    let datos = null;
+
+    try{
+      datos = await respuesta.json();
+    }catch(e){
+      datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+    }
+
+    if(respuesta.status === 401 || respuesta.status === 403){
+      try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+      if(respuesta.status === 401){
+        window.location.replace(rutaLoginCertus());
+      }
+    }
+
+    if(!respuesta.ok || !datos.ok){
+      const error = new Error(datos.mensaje || "No se pudieron cargar tus evidencias.");
+      error.status = respuesta.status;
+      throw error;
+    }
+
+    return Array.isArray(datos.evidencias) ? datos.evidencias : [];
+  }
+
+  async function crearEvidenciaBackend(idInsignia, texto){
+    const respuesta = await fetch("../api/evidencias/crear.php", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        id_insignia: idInsignia,
+        texto
+      })
+    });
+    let datos = null;
+
+    try{
+      datos = await respuesta.json();
+    }catch(e){
+      datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+    }
+
+    if(respuesta.status === 401 || respuesta.status === 403){
+      try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+      if(respuesta.status === 401){
+        window.location.replace(rutaLoginCertus());
+      }
+    }
+
+    if(!respuesta.ok || !datos.ok){
+      const error = new Error(datos.mensaje || "No se pudo enviar la evidencia.");
+      error.status = respuesta.status;
+      throw error;
+    }
+
+    return datos.evidencia || null;
+  }
+
   function normalizarInscripcionReal(inscripcion){
     const cap = inscripcion.capacitacion || {};
 
@@ -154,6 +251,79 @@
         id: parseInt(cap.id, 10)
       }
     };
+  }
+
+  function esValorActivo(valor){
+    return valor === true || valor === 1 || valor === "1";
+  }
+
+  function normalizarEvidenciaReal(evidencia){
+    const insignia = evidencia.insignia || {};
+
+    return {
+      id: parseInt(evidencia.id, 10),
+      id_insignia: parseInt(evidencia.id_insignia, 10),
+      texto: evidencia.texto || "",
+      estado: (evidencia.estado || "").toLowerCase(),
+      fecha_envio: evidencia.fecha_envio,
+      fecha_revision: evidencia.fecha_revision,
+      revisado_por: evidencia.revisado_por,
+      insignia: {
+        ...insignia,
+        id: parseInt(insignia.id, 10)
+      }
+    };
+  }
+
+  function evidenciaMasRecienteInsignia(idInsignia){
+    return misEvidenciasReales.find(e => e.id_insignia === idInsignia) || null;
+  }
+
+  function aplicarEstadoEvidenciaReal(insignia){
+    if(!insignia.evidencia || insignia.ganada) return insignia;
+
+    const evidencia = evidenciaMasRecienteInsignia(insignia.id);
+    if(!evidencia) return insignia;
+
+    return {
+      ...insignia,
+      estadoEvidencia: evidencia.estado,
+      estado_evidencia: evidencia.estado,
+      evidencia_actual: evidencia
+    };
+  }
+
+  function normalizarInsigniaReal(insignia){
+    const id = parseInt(insignia.id, 10);
+    const idCapacitacion = insignia.id_capacitacion_requerida !== null && insignia.id_capacitacion_requerida !== undefined
+      ? parseInt(insignia.id_capacitacion_requerida, 10)
+      : null;
+    const requiereEvidencia = esValorActivo(insignia.requiere_evidencia);
+    const obtenida = esValorActivo(insignia.obtenida);
+    const cumpleRequisito = esValorActivo(insignia.cumple_requisito);
+    const evidenciaAprobada = esValorActivo(insignia.evidencia_aprobada);
+    const estadoEvidencia = evidenciaAprobada || obtenida
+      ? "aprobada"
+      : (insignia.estado_evidencia || null);
+
+    return aplicarEstadoEvidenciaReal({
+      id,
+      nombre: insignia.nombre || "",
+      icono: insignia.codigo_icono || "",
+      codigo_icono: insignia.codigo_icono || "",
+      requisito: insignia.requisito || "",
+      area: insignia.area || "",
+      requiere_capacitacion: Number.isFinite(idCapacitacion) ? idCapacitacion : null,
+      id_capacitacion_requerida: Number.isFinite(idCapacitacion) ? idCapacitacion : null,
+      evidencia: requiereEvidencia,
+      requiere_evidencia: requiereEvidencia,
+      ganada: obtenida,
+      obtenida,
+      cumpleRequisito,
+      cumple_requisito: cumpleRequisito,
+      estadoEvidencia,
+      estado_evidencia: estadoEvidencia
+    });
   }
 
   function duracionHoras(capacitacion){
@@ -192,7 +362,7 @@
 
   function renderResumenProgreso(insignias){
     const totalInsignias = insignias.length;
-    const ganadas = insignias.filter(i => i.ganada).length;
+    const ganadas = insignias.filter(i => i.ganada || i.obtenida).length;
     const porcentaje = porcentajeInsignias(ganadas, totalInsignias);
 
     document.getElementById("tituloProgreso").textContent = `${ganadas} de ${totalInsignias} insignias`;
@@ -231,6 +401,18 @@
   }
 
   function textoEstadoInsignia(ins){
+    const ganada = ins.ganada || ins.obtenida;
+    const requiereEvidencia = ins.evidencia || ins.requiere_evidencia;
+    const cumpleRequisito = ins.cumpleRequisito || ins.cumple_requisito;
+    const estadoEvidencia = ins.estadoEvidencia || ins.estado_evidencia;
+
+    if(ganada) return "Obtenida";
+    if(!requiereEvidencia) return ins.requisito || "";
+    if(!cumpleRequisito) return ins.requisito || "";
+    if(estadoEvidencia === "pendiente") return "Pendiente de revision";
+    if(estadoEvidencia === "rechazada") return "Evidencia rechazada - vuelve a intentar";
+    return "Completaste el requisito. Envia tu evidencia para obtenerla.";
+
     if(ins.ganada) return "Obtenida";
     if(!ins.evidencia) return ins.requisito || "";
     if(!ins.cumpleRequisito) return ins.requisito || "";
@@ -239,14 +421,34 @@
     return "Completaste el requisito. Envia tu evidencia para obtenerla.";
   }
 
-  function renderInsignias(){
-    const actuales = insigniasDeDocente(sesion.id);
-    document.getElementById("gridInsignias").innerHTML = actuales.map(ins => {
+  function renderErrorInsignias(mensaje){
+    document.getElementById("gridInsignias").innerHTML = `
+      <p style="font-size:12.5px;color:var(--text-muted);margin:0;">
+        <i class="fa-solid fa-circle-exclamation"></i> ${mensaje}
+      </p>
+    `;
+  }
+
+  function renderInsignias(insignias = misInsigniasReales){
+    const actuales = insignias.map(aplicarEstadoEvidenciaReal);
+    const grid = document.getElementById("gridInsignias");
+
+    if(!actuales.length){
+      grid.innerHTML = `
+        <p style="font-size:12.5px;color:var(--text-muted);margin:0;">
+          <i class="fa-solid fa-award"></i> Aun no hay insignias disponibles.
+        </p>
+      `;
+      return;
+    }
+
+    grid.innerHTML = actuales.map(ins => {
       const necesitaAccion = !ins.ganada && ins.evidencia && ins.cumpleRequisito && ins.estadoEvidencia !== "pendiente";
       return `
         <div class="insignia ${ins.ganada ? "ganada" : (ins.estadoEvidencia === "pendiente" ? "revision" : "bloqueada")}" title="${ins.requisito || ""}">
           <div class="icono"><i class="fa-solid ${ins.ganada ? iconoInsignia(ins.icono) : (ins.estadoEvidencia === "pendiente" ? "fa-hourglass-half" : "fa-lock")}"></i></div>
           <div class="nombre">${ins.nombre}</div>
+          <span class="requisito">${ins.area || "General"}${ins.evidencia ? " - requiere evidencia" : ""}</span>
           <span class="requisito">${textoEstadoInsignia(ins)}</span>
           ${necesitaAccion ? `<button class="btn btn-outline btn-sm" style="margin-top:6px;padding:4px 10px;font-size:11px;" onclick="abrirEvidencia(${ins.id}, '${ins.nombre.replace(/'/g,"")}')"><i class="fa-solid fa-file-arrow-up"></i> Enviar evidencia</button>` : ""}
         </div>
@@ -264,13 +466,37 @@
   document.getElementById("evidenciaCancelar").addEventListener("click", () => {
     document.getElementById("modalEvidencia").classList.remove("open");
   });
-  document.getElementById("evidenciaEnviar").addEventListener("click", () => {
+
+  async function recargarInsigniasYEvidencias(){
+    const [insignias, evidencias] = await Promise.all([
+      listarMisInsigniasBackend(),
+      listarMisEvidenciasBackend()
+    ]);
+
+    misEvidenciasReales = evidencias.map(normalizarEvidenciaReal);
+    misInsigniasReales = insignias.map(normalizarInsigniaReal);
+    return misInsigniasReales;
+  }
+
+  document.getElementById("evidenciaEnviar").addEventListener("click", async () => {
     const texto = document.getElementById("evidenciaTexto").value.trim();
     if(!texto){ showToast("Describe como aplicaste lo aprendido", "error"); return; }
-    guardarEvidenciaLocal(sesion.id, insigniaEvidenciaActual, texto);
-    document.getElementById("modalEvidencia").classList.remove("open");
-    showToast("Evidencia enviada. El administrador la revisara pronto.", "success");
-    renderInsignias();
+    const boton = document.getElementById("evidenciaEnviar");
+    boton.disabled = true;
+
+    try{
+      await crearEvidenciaBackend(insigniaEvidenciaActual, texto);
+      document.getElementById("modalEvidencia").classList.remove("open");
+      showToast("Evidencia enviada. El administrador la revisara pronto.", "success");
+      const insignias = await recargarInsigniasYEvidencias();
+      renderResumenProgreso(insignias);
+      renderInsignias(insignias);
+      renderRutaRecomendada(insignias);
+    }catch(error){
+      showToast(error.message || "No se pudo enviar la evidencia.", "error");
+    }finally{
+      boton.disabled = false;
+    }
   });
 
   // ===== Mi plan de desarrollo (MEJORA — IPDP) =====
@@ -310,16 +536,20 @@
     if(!docente) return;
 
     // La ruta se prioriza segun la especialidad del docente (personalizada, no generica)
-    const pendientes = insignias.filter(i => !i.ganada && i.requiere_capacitacion);
+    const pendientes = insignias.filter(i => {
+      const idCapacitacionRequerida = i.requiere_capacitacion || i.id_capacitacion_requerida;
+      return !i.ganada && !i.cumpleRequisito && idCapacitacionRequerida;
+    });
     const porEspecialidad = pendientes.find(i => i.area === docente.especialidad);
     const siguiente = porEspecialidad || pendientes[0];
 
     if(!siguiente) return;
 
-    const cap = CAPACITACIONES.find(c => c.id === siguiente.requiere_capacitacion);
+    const idCapacitacion = siguiente.requiere_capacitacion || siguiente.id_capacitacion_requerida;
+    const inscRuta = misInscripcionesReales.find(i => i.capacitacion && i.capacitacion.id === idCapacitacion);
+    const cap = (inscRuta && inscRuta.capacitacion) || CAPACITACIONES.find(c => c.id === idCapacitacion);
     if(!cap) return;
 
-    const inscRuta = INSCRIPCIONES.find(i => i.id_docente === sesion.id && i.id_capacitacion === cap.id);
     document.getElementById("rutaRecomendada").style.display = "block";
     document.getElementById("rutaEspecialidad").innerHTML =
       `<i class="fa-solid fa-compass"></i> Basada en tu especialidad: <b>${docente.especialidad}</b>`;
@@ -348,9 +578,24 @@
       showToast(error.message || "No se pudo cargar tu progreso.", "error");
     }
 
-    const insignias = insigniasDeDocente(sesion.id);
+    let errorInsignias = null;
+    try{
+      await recargarInsigniasYEvidencias();
+    }catch(error){
+      if(error.status === 401) return;
+      misInsigniasReales = [];
+      misEvidenciasReales = [];
+      errorInsignias = error.message || "No se pudieron cargar tus insignias.";
+      showToast(errorInsignias, "error");
+    }
+
+    const insignias = misInsigniasReales;
     renderResumenProgreso(insignias);
-    renderInsignias();
+    if(errorInsignias){
+      renderErrorInsignias(errorInsignias);
+    }else{
+      renderInsignias(insignias);
+    }
     renderPlan();
     renderRutaRecomendada(insignias);
   }

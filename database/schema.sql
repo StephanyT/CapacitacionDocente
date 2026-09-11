@@ -72,6 +72,55 @@ CREATE TABLE IF NOT EXISTS inscripciones (
     CHECK (estado IN ('pendiente', 'en curso', 'completada'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS insignias (
+  id INT(11) NOT NULL AUTO_INCREMENT,
+  nombre VARCHAR(120) NOT NULL,
+  codigo_icono VARCHAR(20) NOT NULL,
+  requisito VARCHAR(255) DEFAULT NULL,
+  area VARCHAR(100) DEFAULT NULL,
+  id_capacitacion_requerida INT(11) DEFAULT NULL,
+  requiere_evidencia TINYINT(1) NOT NULL DEFAULT 0,
+  activo TINYINT(1) NOT NULL DEFAULT 1,
+  fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_insignias_capacitacion (id_capacitacion_requerida),
+  KEY idx_insignias_activo (activo),
+  CONSTRAINT fk_insignias_capacitacion
+    FOREIGN KEY (id_capacitacion_requerida) REFERENCES capacitaciones (id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS evidencias_insignia (
+  id INT(11) NOT NULL AUTO_INCREMENT,
+  id_docente INT(11) NOT NULL,
+  id_insignia INT(11) NOT NULL,
+  texto TEXT NOT NULL,
+  estado ENUM('pendiente', 'aprobada', 'rechazada') NOT NULL DEFAULT 'pendiente',
+  fecha_envio TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  fecha_revision TIMESTAMP NULL DEFAULT NULL,
+  revisado_por INT(11) DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY idx_evidencias_docente (id_docente),
+  KEY idx_evidencias_insignia (id_insignia),
+  KEY idx_evidencias_estado (estado),
+  KEY idx_evidencias_revisado_por (revisado_por),
+  CONSTRAINT fk_evidencias_docente
+    FOREIGN KEY (id_docente) REFERENCES usuarios (id)
+    ON UPDATE CASCADE
+    ON DELETE RESTRICT,
+  CONSTRAINT fk_evidencias_insignia
+    FOREIGN KEY (id_insignia) REFERENCES insignias (id)
+    ON UPDATE CASCADE
+    ON DELETE RESTRICT,
+  CONSTRAINT fk_evidencias_revisado_por
+    FOREIGN KEY (revisado_por) REFERENCES usuarios (id)
+    ON UPDATE CASCADE
+    ON DELETE SET NULL,
+  CONSTRAINT chk_evidencias_estado
+    CHECK (estado IN ('pendiente', 'aprobada', 'rechazada'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS solicitudes_capacitacion (
   id INT(11) NOT NULL AUTO_INCREMENT,
   id_docente INT(11) NOT NULL,

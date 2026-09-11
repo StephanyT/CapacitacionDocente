@@ -96,6 +96,7 @@
 
   const motivosBajaSesion = {};
   let deepLinkDocenteProcesado = false;
+  let evidenciasPendientesReales = [];
 
   function iniciales(nombres, apellidos){
     return (((nombres || "?")[0] || "?") + ((apellidos || "?")[0] || "?")).toUpperCase();
@@ -134,6 +135,28 @@
 
   function sincronizarDocentesGestion(lista){
     DOCENTES.splice(0, DOCENTES.length, ...(lista || []).map(normalizarDocenteGestion));
+  }
+
+  function normalizarEvidenciaPendienteGestion(evidencia){
+    const docente = evidencia.docente || {};
+    const insignia = evidencia.insignia || {};
+
+    return {
+      id: parseInt(evidencia.id, 10),
+      id_docente: parseInt(evidencia.id_docente, 10),
+      id_insignia: parseInt(evidencia.id_insignia, 10),
+      texto: evidencia.texto || "",
+      estado: evidencia.estado || "",
+      fecha_envio: evidencia.fecha_envio || "",
+      docente: {
+        ...docente,
+        id: parseInt(docente.id, 10)
+      },
+      insignia: {
+        ...insignia,
+        id: parseInt(insignia.id, 10)
+      }
+    };
   }
 
   async function apiDocentes(ruta, opciones){
@@ -176,6 +199,56 @@
     return datos;
   }
 
+  async function apiEvidencias(ruta, opciones){
+    const config = {
+      credentials: "same-origin",
+      headers: { "Accept": "application/json" },
+      ...(opciones || {})
+    };
+
+    if(config.body && !(config.body instanceof FormData)){
+      config.headers = {
+        ...config.headers,
+        "Content-Type": "application/json"
+      };
+      if(typeof config.body !== "string"){
+        config.body = JSON.stringify(config.body);
+      }
+    }
+
+    const respuesta = await fetch(rutaBackendCertus(`api/evidencias/${ruta}`), config);
+    let datos = null;
+
+    try{
+      datos = await respuesta.json();
+    }catch(e){
+      datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+    }
+
+    if(respuesta.status === 401 || respuesta.status === 403){
+      try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+      if(respuesta.status === 401){
+        window.location.replace(rutaLoginCertus());
+      }
+    }
+
+    if(!respuesta.ok || !datos.ok){
+      throw new Error(datos.mensaje || "No se pudo completar la operacion.");
+    }
+
+    return datos;
+  }
+
+  async function cargarEvidenciasPendientes(){
+    const datos = await apiEvidencias("listar_pendientes.php");
+    evidenciasPendientesReales = (datos.evidencias || []).map(normalizarEvidenciaPendienteGestion);
+    return evidenciasPendientesReales;
+  }
+
+  function evidenciasPendientesDocente(idDocente){
+    return evidenciasPendientesReales.filter(e => e.id_docente === idDocente);
+  }
+
   function estadoDocenteGestion(id){
     const docente = DOCENTES.find(x => x.id === id);
     if(!docente || parseInt(docente.activo, 10) !== 0) return null;
@@ -189,6 +262,12 @@
     try{
       const datos = await apiDocentes("listar.php");
       sincronizarDocentesGestion(datos.docentes || []);
+      try{
+        await cargarEvidenciasPendientes();
+      }catch(errorEvidencias){
+        evidenciasPendientesReales = [];
+        showToast(errorEvidencias.message, "error");
+      }
       render();
 
       if(!deepLinkDocenteProcesado && docenteDesdeURL && DOCENTES.some(d => d.id === parseInt(docenteDesdeURL, 10))){
@@ -311,7 +390,7 @@
     const misConstancias = CONSTANCIAS.filter(c => completadas.some(i => i.id === c.id_inscripcion));
     const historial = [...misInscripciones].sort((a,b) => new Date(b.fecha_actualizacion || b.fecha_inscripcion) - new Date(a.fecha_actualizacion || a.fecha_inscripcion)).slice(0,5);
     const plan = planDeDocente(id);
-    const evidenciasPendientes = evidenciasDeDocente(id).filter(e => e.estado === "pendiente");
+    const evidenciasPendientes = evidenciasPendientesDocente(id);
     const inactivo = estadoDocenteGestion(id);
 
     // Ciclo de actualizacion profesional (MEJORA — MyGTCS): el admin
@@ -389,11 +468,10 @@
         <div class="mentor-modal-section">
           <h4><i class="fa-solid fa-file-circle-check"></i> Evidencias de insignias por revisar</h4>
           ${evidenciasPendientes.map(e => {
-            const ins = INSIGNIAS.find(x => x.id === e.id_insignia);
             return `
               <div class="review-item">
-                <div class="r-head"><span>${ins ? ins.nombre : "Insignia"}</span><span style="font-size:11px;color:var(--text-muted);">${e.fecha}</span></div>
-                <p>${e.texto}</p>
+                <div class="r-head"><span>${escaparHtml(e.insignia.nombre || "Insignia")}</span><span style="font-size:11px;color:var(--text-muted);">${escaparHtml(e.fecha_envio)}</span></div>
+                <p>${escaparHtml(e.texto)}</p>
                 <div style="display:flex;gap:8px;margin-top:8px;">
                   <button class="btn btn-outline btn-sm" onclick="revisarEvidencia(${id}, ${e.id}, 'rechazada')"><i class="fa-solid fa-xmark"></i> Rechazar</button>
                   <button class="btn btn-primary btn-sm" onclick="revisarEvidencia(${id}, ${e.id}, 'aprobada')"><i class="fa-solid fa-check"></i> Aprobar</button>
@@ -424,10 +502,21 @@
     `;
     document.getElementById("modalPerfilDocente").classList.add("open");
   }
-  function revisarEvidencia(idDocente, idEvidencia, nuevoEstado){
-    actualizarEstadoEvidenciaLocal(idDocente, idEvidencia, nuevoEstado);
-    showToast(nuevoEstado === "aprobada" ? "Evidencia aprobada — insignia otorgada" : "Evidencia rechazada", nuevoEstado === "aprobada" ? "success" : "info");
-    abrirPerfilDocente(idDocente);
+  async function revisarEvidencia(idDocente, idEvidencia, nuevoEstado){
+    try{
+      await apiEvidencias("revisar.php", {
+        method: "POST",
+        body: {
+          id_evidencia: idEvidencia,
+          estado: nuevoEstado
+        }
+      });
+      await cargarEvidenciasPendientes();
+      showToast(nuevoEstado === "aprobada" ? "Evidencia aprobada - insignia otorgada" : "Evidencia rechazada", nuevoEstado === "aprobada" ? "success" : "info");
+      abrirPerfilDocente(idDocente);
+    }catch(error){
+      showToast(error.message, "error");
+    }
   }
   function confirmarCiclo(idDocente, periodo){
     const sesion = getSesionActiva();
