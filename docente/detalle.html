@@ -10,18 +10,18 @@
 <link rel="icon" type="image/x-icon" href="../img/favicon_certus.ico">
 
 <title>CERTUS | Detalle de capacitacion</title>
-<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="../css/theme.css">
 </head>
 <body>
 <div class="app">
   <nav class="topnav">
     <div class="topnav-left"><img src="../img/certus_logo.png" alt="CERTUS" class="brand-logo"><span class="brand-divider"></span><span class="brand-label">Panel Docente</span></div>
     <div class="topnav-links">
-      <a href="perfil.html">Perfil</a>
       <a href="mis_capacitaciones.html" class="active">Mis capacitaciones</a>
       <a href="constancias.html">Constancias</a>
       <a href="mi_progreso.html">Mi progreso</a>
       <a href="mentores.html">Mentores</a>
+      <a href="perfil.html">Perfil</a>
     </div>
     <div class="topnav-right" id="topnavRight"></div>
   </nav>
@@ -35,29 +35,38 @@
   </main>
 </div>
 
-<script src="../js/data.js"></script>
-<script src="../js/app.js"></script>
+<!-- Modal Solicitar ampliacion de plazo (solo cuando la inscripcion esta vencida) -->
+<div class="modal-overlay" id="modalAmpliacion">
+  <div class="modal-box" style="width:380px;text-align:left;">
+    <h3 style="color:var(--navy);margin-bottom:.35rem;"><i class="fa-solid fa-calendar-plus"></i> Solicitar ampliacion de plazo</h3>
+    <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:1rem;">Cuentale al administrador por que necesitas mas tiempo. Tu solicitud queda pendiente hasta que la revise.</p>
+    <div class="form-group">
+      <label>Motivo</label>
+      <textarea id="ampliacionMotivo" rows="3" placeholder="Ej: estuve de licencia medica las ultimas dos semanas..."></textarea>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-outline btn-sm" onclick="cerrarModalAmpliacion()" type="button"><i class="fa-solid fa-xmark"></i> Cancelar</button>
+      <button class="btn btn-primary btn-sm" id="btnEnviarAmpliacion" type="button"><i class="fa-solid fa-paper-plane"></i> Enviar solicitud</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/data.js?v=20260916n"></script>
+<script src="../js/app.js?v=20260916n"></script>
 <script>
   const sesion = requireSesion("docente");
-  const idInscripcion = parseInt(new URLSearchParams(window.location.search).get("id"));
+  const params = new URLSearchParams(window.location.search);
+  const idInscripcion = parseInt(params.get("id"), 10);
+  const idCapacitacionDirecta = parseInt(params.get("capacitacion"), 10);
+  let capacitaciones = [];
   // BUG real encontrado: antes caia silenciosamente en INSCRIPCIONES[0] si el
   // id de la URL no existia — eso podia mostrar la capacitacion de OTRO
   // docente sin ningun aviso. Ahora se exige que la inscripcion sea tuya, y
   // si no lo es, se redirige en vez de mostrar datos que no te pertenecen.
-  let i = INSCRIPCIONES.find(x => x.id === idInscripcion && x.id_docente === sesion.id);
-  if(!i){
-    i = INSCRIPCIONES.find(x => x.id_docente === sesion.id);
-  }
-  if(!i){
-    // Sin inscripciones todavia (docente recien creado, sin capacitaciones
-    // asignadas aun) — bug real encontrado al vaciar los datos para la demo:
-    // antes esto seguia ejecutando el resto del script sobre un valor
-    // inexistente y se caia con un error. Ahora se redirige y se detiene
-    // aca mismo, sin intentar leer una capacitacion que no existe.
-    window.location.href = "mis_capacitaciones.html";
-    throw new Error("Sin inscripciones — redirigiendo a mis_capacitaciones.html");
-  }
-  const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
+  let i = null;
+  let cap = null;
+  let REFLEX_KEY = "";
+  let miSolicitudAmpliacion = null;
 
   // ===== Reflexion personal por tema (MEJORA, solo v2) =====
   // Basado en el ciclo de CPD (Continuing Professional Development) que usan
@@ -67,7 +76,6 @@
   // breve por tema como evidencia personal de su aprendizaje.
   // Esto NO toca i.estado en ningun momento: el estado OFICIAL de la
   // capacitacion sigue siendo actualizado unicamente por el administrador (RF-11).
-  const REFLEX_KEY = `certus_reflexion_${sesion.id}_${cap.id}`;
   function leerReflexiones(){
     try{ return JSON.parse(localStorage.getItem(REFLEX_KEY)) || []; }catch(e){ return []; }
   }
@@ -96,6 +104,56 @@
     if(lbl){ lbl.textContent = `${hechos}/${total} temas con reflexion (${pct}%)`; }
   }
 
+  // ===== Solicitar ampliacion de plazo (logica de gestion de vencidas) =====
+  // Solo aplica cuando i.estado === "vencida". Si ya existe una solicitud
+  // para esta inscripcion, se muestra su estado en vez del boton (para no
+  // dejar que el docente mande la misma solicitud varias veces).
+  function renderCardAmpliacion(){
+    if(miSolicitudAmpliacion && miSolicitudAmpliacion.estado === "pendiente"){
+      return `<i class="fa-solid fa-hourglass-half" style="color:var(--warning);"></i> Ya enviaste una solicitud de ampliacion el ${miSolicitudAmpliacion.fecha_solicitud}. Un administrador la revisara.`;
+    }
+    if(miSolicitudAmpliacion && miSolicitudAmpliacion.estado === "rechazada"){
+      return `
+        <p style="margin-bottom:.6rem;"><i class="fa-solid fa-circle-info" style="color:#8a2a1e;"></i> Tu solicitud de ampliacion no fue aprobada${miSolicitudAmpliacion.motivo_rechazo ? `: ${miSolicitudAmpliacion.motivo_rechazo}` : "."}</p>
+        <button class="btn btn-primary btn-sm" onclick="abrirSolicitarAmpliacion()" style="width:100%;justify-content:center;" type="button"><i class="fa-solid fa-paper-plane"></i> Volver a solicitar</button>
+      `;
+    }
+    return `
+      <p style="margin-bottom:.6rem;"><i class="fa-solid fa-triangle-exclamation" style="color:var(--danger);"></i> Esta capacitacion vencio sin completarse. Si tienes un motivo valido, puedes pedirle al administrador mas plazo.</p>
+      <button class="btn btn-primary btn-sm" onclick="abrirSolicitarAmpliacion()" style="width:100%;justify-content:center;" type="button"><i class="fa-solid fa-calendar-plus"></i> Solicitar ampliacion de plazo</button>
+    `;
+  }
+
+  function abrirSolicitarAmpliacion(){
+    document.getElementById("ampliacionMotivo").value = "";
+    document.getElementById("modalAmpliacion").classList.add("open");
+  }
+  function cerrarModalAmpliacion(){
+    document.getElementById("modalAmpliacion").classList.remove("open");
+  }
+  document.getElementById("btnEnviarAmpliacion").addEventListener("click", async (evt) => {
+    const motivo = document.getElementById("ampliacionMotivo").value.trim();
+    if(!motivo){ showToast("Cuentanos el motivo antes de enviar", "error"); return; }
+    if(!i || !i.id){ showToast("No se pudo identificar tu inscripcion.", "error"); return; }
+    try{
+      await conEstadoCarga(evt.currentTarget, "Enviando...", () => crearSolicitudAmpliacionBackend(i.id, motivo));
+      showToast("Solicitud de ampliacion enviada. Un administrador la revisara.", "success");
+      cerrarModalAmpliacion();
+      await misSolicitudesAmpliacionBackend();
+      miSolicitudAmpliacion = SOLICITUDES_AMPLIACION.find(s => s.inscripcion.id === i.id) || null;
+      renderDetalle();
+    }catch(error){
+      if(error.status === 409){
+        showToast(error.message || "Ya tienes una solicitud pendiente para esta capacitacion.", "error");
+        await misSolicitudesAmpliacionBackend();
+        miSolicitudAmpliacion = SOLICITUDES_AMPLIACION.find(s => s.inscripcion.id === i.id) || null;
+        renderDetalle();
+      } else if(error.status !== 401){
+        showToast(error.message || "No se pudo enviar la solicitud.", "error");
+      }
+    }
+  });
+
   function toggleAccordion(idx){
     document.getElementById(`acc-${idx}`).classList.toggle("open");
   }
@@ -105,15 +163,15 @@
     document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === `tab-${tab}`));
   }
 
-  const iniciales = (cap.instructor || "C E").replace(/^(Ing\.|Mg\.|Lic\.|Dr\.|Dra\.)\s*/, "").split(" ").slice(0,2).map(w => w[0]).join("").toUpperCase();
+  function renderDetalle(){
+    const iniciales = (cap.instructor || "C E").replace(/^(Ing\.|Mg\.|Lic\.|Dr\.|Dra\.)\s*/, "").split(" ").slice(0,2).map(w => w[0]).join("").toUpperCase();
 
-  const reflexionesArr = leerReflexiones();
+    const reflexionesArr = leerReflexiones();
 
-  document.getElementById("contenido").innerHTML = `
+    document.getElementById("contenido").innerHTML = `
     <div class="detalle-hero">
       <div class="detalle-hero-top">
-        <span class="badge ${badgeClase(i.estado)}">${badgeTexto(i.estado)}</span>
-        <span class="semaforo ${semaforoClase(i)}" style="margin:0;" title="Estado de cumplimiento"></span>
+        ${badgeConVencimiento(i)}
       </div>
       <h2>${cap.titulo}</h2>
       <p>${cap.descripcion}</p>
@@ -189,7 +247,7 @@
             <div class="row"><span>Sede</span><span>${cap.sede}</span></div>
             <div class="row"><span>Instructor</span><span>${cap.instructor || "Por confirmar"}</span></div>
             <div class="row"><span>Programa</span><span>${cap.programa}</span></div>
-            <div class="row"><span>Fecha limite</span><span>${i.fecha_limite}</span></div>
+            <div class="row"><span>Fecha limite</span><span style="${i.estado !== "completada" && semaforoClase(i) !== "semaforo-verde" ? `color:${semaforoClase(i) === "semaforo-rojo" ? "var(--danger)" : "#9a6700"};font-weight:700;` : ""}">${i.fecha_limite}${i.estado !== "completada" && semaforoClase(i) === "semaforo-ambar" ? " (vence pronto)" : ""}</span></div>
             <h2 style="margin-top:1.1rem;"><i class="fa-solid fa-clipboard-check"></i> Requisitos</h2>
             <div class="requisitos-box"><i class="fa-solid fa-triangle-exclamation" style="color:var(--warning);"></i> ${cap.requisitos || "Ninguno."}</div>
           </div>
@@ -199,6 +257,10 @@
               <i class="fa-solid fa-award" style="font-size:26px;color:var(--secondary);margin-bottom:.5rem;display:block;"></i>
               <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:.75rem;">Completaste esta capacitacion. Tu constancia ya esta disponible.</p>
               <a href="constancias.html" class="btn btn-primary btn-sm" style="width:100%;justify-content:center;"><i class="fa-solid fa-certificate"></i> Ver mi constancia</a>
+            </div>
+          ` : i.estado === "vencida" ? `
+            <div class="card" style="font-size:12.5px;">
+              ${renderCardAmpliacion()}
             </div>
           ` : `
             <div class="card" style="font-size:12px;color:var(--text-muted);background:var(--bg);">
@@ -222,12 +284,17 @@
   // Mismo programa, excluyendo la actual. Si el docente ya tiene una
   // inscripcion propia, navega a su detalle; si no, solo informa (no permite
   // autoinscribirse, segun RF-08).
-  const relacionadas = CAPACITACIONES.filter(c => c.programa === cap.programa && c.id !== cap.id).slice(0, 3);
+    const relacionadas = capacitaciones.filter(c => c.programa === cap.programa && c.id !== cap.id).slice(0, 3);
   document.getElementById("relacionadas").innerHTML = relacionadas.length ? relacionadas.map(c => {
     const miInscripcion = INSCRIPCIONES.find(x => x.id_docente === sesion.id && x.id_capacitacion === c.id);
+    // Si no esta asignada, no abre nada aqui (RF-08: el docente no se
+    // auto-inscribe) pero SI la manda a Mis capacitaciones con ?ver=<id>,
+    // que abre de una vez el modal de informacion de esa misma capacitacion
+    // (con el boton de Solicitar) — mandarlo solo a la pagina general,
+    // sin el id, lo dejaba buscandola visualmente entre "Disponibles".
     const accion = miInscripcion
       ? `onclick="window.location.href='detalle.html?id=${miInscripcion.id}'"`
-      : `onclick="showToast('Aun no tienes esta capacitacion asignada. Consulta con tu administrador.', 'info')"`;
+      : `onclick="window.location.href='mis_capacitaciones.html?ver=${c.id}'"`;
     return `
       <div class="related-card" ${accion}>
         <span class="r-tag">${miInscripcion ? badgeTexto(miInscripcion.estado) : "No asignada"}</span>
@@ -237,6 +304,72 @@
       </div>
     `;
   }).join("") : `<p style="font-size:12.5px;color:var(--text-muted);">No hay otras capacitaciones en este programa por el momento.</p>`;
+  }
+
+  async function iniciarDetalle(){
+    try{
+      [capacitaciones] = await Promise.all([listarCapacitacionesBackend(), misInscripcionesBackend()]);
+
+      if(Number.isInteger(idInscripcion)){
+        i = INSCRIPCIONES.find(x => x.id === idInscripcion && x.id_docente === sesion.id) || null;
+      }
+
+      let idCapacitacion = Number.isInteger(idCapacitacionDirecta) && idCapacitacionDirecta > 0
+        ? idCapacitacionDirecta
+        : (i ? i.id_capacitacion : null);
+
+      if(!idCapacitacion && Number.isInteger(idInscripcion) && idInscripcion > 0){
+        idCapacitacion = idInscripcion;
+      }
+
+      if(!idCapacitacion){
+        window.location.href = "mis_capacitaciones.html";
+        return;
+      }
+
+      cap = await obtenerCapacitacionBackend(idCapacitacion);
+      REFLEX_KEY = `certus_reflexion_${sesion.id}_${cap.id}`;
+
+      // BUG real (ya existia antes de esta sesion, quedaba oculto): cuando se
+      // llega aqui solo con ?capacitacion=<id> (como hace el boton "Ver
+      // detalle" de mis_capacitaciones.html), nunca se buscaba la
+      // inscripcion real -- se armaba directo el objeto de mentira de abajo
+      // con estado fijo en "pendiente", aunque el docente ya tuviera una
+      // inscripcion real (vencida, en curso, completada...) para esa
+      // capacitacion. El badge se veia bien igual porque se calcula por
+      // fecha, pero cualquier logica que dependiera del estado real (como
+      // esta tarjeta de "Solicitar ampliacion") nunca se activaba.
+      if(!i){
+        i = INSCRIPCIONES.find(x => x.id_docente === sesion.id && x.id_capacitacion === idCapacitacion) || null;
+      }
+
+      if(!i){
+        i = {
+          id: null,
+          id_docente: sesion.id,
+          id_capacitacion: cap.id,
+          estado: "pendiente",
+          fecha_limite: cap.fecha
+        };
+      }
+
+      if(i.estado === "vencida" && i.id){
+        try{
+          await misSolicitudesAmpliacionBackend();
+          miSolicitudAmpliacion = SOLICITUDES_AMPLIACION.find(s => s.inscripcion.id === i.id) || null;
+        }catch(e){
+          miSolicitudAmpliacion = null;
+        }
+      }
+
+      renderDetalle();
+    }catch(error){
+      document.getElementById("contenido").innerHTML =
+        `<div class="card"><p style="font-size:13px;color:#c62828;">${error.message}</p></div>`;
+    }
+  }
+
+  iniciarDetalle();
 </script>
 </body>
 </html>

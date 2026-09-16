@@ -10,7 +10,7 @@
 <link rel="icon" type="image/x-icon" href="../img/favicon_certus.ico">
 
 <title>CERTUS | Gestion de capacitaciones</title>
-<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="../css/theme.css">
 </head>
 <body>
 <div class="app">
@@ -33,12 +33,11 @@
       <button class="btn btn-primary" onclick="abrirNueva()"><i class="fa-solid fa-plus"></i> Nueva capacitacion</button>
     </div>
 
-    <div class="table-scroll">
-<table>
+    <div class="search-box"><i class="fa-solid fa-magnifying-glass"></i><label for="buscadorCapacitaciones" class="visually-hidden">Buscar capacitacion</label><input type="text" placeholder="Buscar por titulo, sede o programa..." id="buscadorCapacitaciones" aria-label="Buscar capacitacion"></div>
+    <table>
       <thead><tr><th>Titulo</th><th>Fecha</th><th>Sede</th><th>Programa</th><th>Estado</th><th>Docentes</th><th></th></tr></thead>
       <tbody id="tablaCapacitaciones"></tbody>
     </table>
-</div>
     <nav aria-label="Paginacion de capacitaciones" style="margin-top:1rem;">
       <ul class="pager" id="paginacionCapacitaciones"></ul>
     </nav>
@@ -47,6 +46,12 @@
       <h2><i class="fa-solid fa-inbox"></i> Solicitudes de acceso a capacitaciones</h2>
       <p style="font-size:12px;color:var(--text-muted);margin-bottom:.85rem;"><i class="fa-solid fa-circle-info"></i> Docentes que pidieron acceso a una capacitacion del catalogo que aun no tenian asignada. Aprobar crea la inscripcion (RF-08); rechazar solo cierra la solicitud.</p>
       <div id="listaSolicitudesAdmin"></div>
+    </div>
+
+    <div class="card" id="cardAmpliacion" style="margin-top:1rem;display:none;">
+      <h2><i class="fa-solid fa-calendar-plus"></i> Solicitudes de ampliacion de plazo</h2>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:.85rem;"><i class="fa-solid fa-circle-info"></i> Docentes con una capacitacion vencida que pidieron mas plazo. Aprobar reprograma la fecha limite y la reactiva; rechazar la deja vencida.</p>
+      <div id="listaAmpliacionAdmin"></div>
     </div>
 
     <div class="card" id="cardSugerencias" style="margin-top:1rem;display:none;">
@@ -59,7 +64,7 @@
 
 <!-- Modal Nueva/Editar capacitacion -->
 <div class="modal-overlay" id="modalForm">
-  <div class="modal-box" style="width:420px;text-align:left;">
+  <div class="modal-box" style="width:460px;text-align:left;max-height:85vh;overflow-y:auto;">
     <h3 id="tituloModalForm">Nueva capacitacion</h3>
     <div class="form-group"><label>Titulo</label><input type="text" id="fTitulo"></div>
     <div class="form-group"><label>Descripcion</label><textarea id="fDescripcion" rows="2"></textarea></div>
@@ -74,48 +79,80 @@
       </div>
       <div class="form-group">
         <label>Programa</label>
-        <select id="fPrograma"><option>Diseno y Desarrollo de Software</option><option>Administracion</option><option>Marketing</option><option>Idiomas</option><option>Psicologia</option></select>
+        <select id="fPrograma"><option>Diseño y Desarrollo de Software</option><option>Administracion</option><option>Marketing</option><option>Idiomas</option><option>Psicologia</option></select>
       </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group"><label>Instructor</label><input type="text" id="fInstructor" placeholder="Mg. Nombre Apellido"></div>
+      <div class="form-group"><label>Bio del instructor</label><input type="text" id="fInstructorBio"></div>
+    </div>
+    <div class="form-group"><label>Requisitos</label><textarea id="fRequisitos" rows="2"></textarea></div>
+    <div class="form-group">
+      <label>Objetivos (uno por linea)</label>
+      <textarea id="fObjetivos" rows="3" placeholder="Un objetivo por linea"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Temario (uno por linea)</label>
+      <textarea id="fTemario" rows="3" placeholder="Un tema por linea"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Habilidades (una por linea)</label>
+      <textarea id="fHabilidades" rows="2" placeholder="Una habilidad por linea"></textarea>
     </div>
     <div class="form-group">
       <label>Asignar a docentes (RF-08)</label>
-      <div id="listaCheckDocentes" style="max-height:110px;overflow-y:auto;border:1px solid #ced4da;border-radius:8px;padding:8px;"></div>
+      <input type="text" id="buscadorCheckDocentes" placeholder="Buscar docente por nombre..." style="width:100%;padding:7px 10px;border:1px solid var(--secondary);border-radius:6px;font-size:12.5px;font-family:inherit;margin-bottom:6px;background:var(--surface);color:var(--text);">
+      <div id="contadorCheckDocentes" style="font-size:11px;color:var(--text-muted);margin-bottom:4px;"></div>
+      <div id="listaCheckDocentes" style="max-height:170px;overflow-y:auto;border:1px solid var(--secondary);border-radius:8px;padding:4px;"></div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:.5rem;">
       <button class="btn btn-outline" onclick="cerrarModales()"><i class="fa-solid fa-xmark"></i> Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarCapacitacion()"><i class="fa-solid fa-check"></i> Guardar</button>
+      <button class="btn btn-primary" onclick="guardarCapacitacion(this)"><i class="fa-solid fa-check"></i> Guardar</button>
     </div>
   </div>
 </div>
 
 <!-- Modal Docentes de la capacitacion -->
 <div class="modal-overlay" id="modalDocentes">
-  <div class="modal-box" style="width:460px;text-align:left;">
+  <div class="modal-box" style="width:540px;text-align:left;">
     <h3 id="tituloModalDocentes">Docentes de la capacitacion</h3>
-    <div class="table-scroll">
-<table style="margin-top:.75rem;">
+    <table style="margin-top:.75rem;">
       <thead><tr><th>Docente</th><th>Estado</th><th></th></tr></thead>
       <tbody id="tablaDocentesCap"></tbody>
     </table>
-</div>
     <div style="text-align:right;margin-top:1rem;">
       <button class="btn btn-outline" onclick="cerrarModales()"><i class="fa-solid fa-xmark"></i> Cerrar</button>
     </div>
   </div>
 </div>
 
-<script src="../js/data.js"></script>
-<script src="../js/app.js"></script>
+<script src="../js/data.js?v=20260916n"></script>
+<script src="../js/app.js?v=20260916n"></script>
 <script>
-  requireSesion("admin");
+  const sesion = requireSesion("admin");
+  let capacitaciones = [];
+  let solicitudesCapacitacion = [];
 
   function contarDocentes(idCap){
     return INSCRIPCIONES.filter(i => i.id_capacitacion === idCap).length;
   }
 
   // Paginacion — mismo patron que gestion_docentes.html.
-  const CAPACITACIONES_POR_PAGINA = 5;
+  const CAPACITACIONES_POR_PAGINA = 12;
   let paginaActualCapacitaciones = 1;
+  let filtroCapacitaciones = "";
+
+  // NOTA: el filtro por semaforo (vencidas/por vencer) que vivia aqui se
+  // quito -- esta tabla agrupa por capacitacion, y para encontrar QUIEN esta
+  // vencido con su fecha exacta, la vista correcta es el Dashboard
+  // ("Semaforo de cumplimiento", un docente por fila). Las notificaciones de
+  // la campanita ahora enlazan alli, y desde esa tabla el boton "Gestionar"
+  // trae directo aqui a la capacitacion especifica via ?docentes=ID (ver
+  // cargarCapacitacionesAdmin).
+  function capacitacionesFiltradas(){
+    if(!filtroCapacitaciones) return capacitaciones;
+    return capacitaciones.filter(c => `${c.titulo} ${c.sede} ${c.programa}`.toLowerCase().includes(filtroCapacitaciones));
+  }
 
   function cambiarPaginaCapacitaciones(pagina){
     paginaActualCapacitaciones = pagina;
@@ -142,10 +179,11 @@
   }
 
   function render(){
-    const totalPaginas = Math.max(1, Math.ceil(CAPACITACIONES.length / CAPACITACIONES_POR_PAGINA));
+    const lista = capacitacionesFiltradas();
+    const totalPaginas = Math.max(1, Math.ceil(lista.length / CAPACITACIONES_POR_PAGINA));
     if(paginaActualCapacitaciones > totalPaginas) paginaActualCapacitaciones = totalPaginas;
     const inicio = (paginaActualCapacitaciones - 1) * CAPACITACIONES_POR_PAGINA;
-    const pagina = CAPACITACIONES.slice(inicio, inicio + CAPACITACIONES_POR_PAGINA);
+    const pagina = lista.slice(inicio, inicio + CAPACITACIONES_POR_PAGINA);
 
     document.getElementById("tablaCapacitaciones").innerHTML = pagina.length ? pagina.map(c => `
       <tr>
@@ -153,10 +191,11 @@
         <td>${c.fecha}</td>
         <td>${c.sede} ${esVirtual(c) ? `<i class="fa-solid fa-laptop" style="color:var(--info);" title="Aula Virtual"></i>` : ""}</td>
         <td>${c.programa}</td>
-        <td><span class="badge badge-curso">${c.estado}</span></td>
+        <td><span class="badge ${c.activo ? "badge-curso" : "badge-pendiente"}">${c.estado}</span></td>
         <td>${contarDocentes(c.id)} asignados</td>
         <td style="display:flex;gap:6px;">
           <button class="btn btn-outline btn-sm" onclick="abrirEditar(${c.id})"><i class="fa-solid fa-pen"></i> Editar</button>
+          <button class="btn btn-outline btn-sm" onclick="cambiarEstadoCapacitacion(${c.id}, ${!c.activo}, this)"><i class="fa-solid ${c.activo ? "fa-ban" : "fa-rotate-left"}"></i> ${c.activo ? "Desactivar" : "Reactivar"}</button>
           <button class="btn btn-outline btn-sm" onclick="abrirDocentes(${c.id})"><i class="fa-solid fa-users"></i> Docentes</button>
         </td>
       </tr>
@@ -164,32 +203,60 @@
 
     renderPaginacionCapacitaciones(totalPaginas);
   }
-  render();
-
   let idCapacitacionEnEdicion = null;
 
-  function renderCheckDocentes(idCap){
+  // El set de seleccionados es la fuente de verdad (no el DOM): asi, cuando
+  // el admin filtra por nombre, los checks que hizo antes de buscar no se
+  // pierden aunque esos docentes queden temporalmente fuera de la vista.
+  // Bug evitado: antes, si esto se re-renderizaba con un filtro, un docente
+  // recien marcado que quedara fuera de la busqueda perdia su seleccion
+  // porque el checked solo se calculaba desde las inscripciones ya guardadas.
+  let seleccionadosCheckDocentes = new Set();
+
+  function iniciarCheckDocentes(idCap){
     const asignadosIds = idCap
       ? INSCRIPCIONES.filter(i => i.id_capacitacion === idCap).map(i => i.id_docente)
       : [];
-    document.getElementById("listaCheckDocentes").innerHTML = DOCENTES.map(d => `
-      <label style="display:block;font-size:13px;margin:4px 0;">
-        <input type="checkbox" value="${d.id}" ${asignadosIds.includes(d.id) ? "checked" : ""}>
-        ${d.nombres} ${d.apellidos}
+    seleccionadosCheckDocentes = new Set(asignadosIds);
+    const buscador = document.getElementById("buscadorCheckDocentes");
+    if(buscador) buscador.value = "";
+    renderListaCheckDocentes();
+  }
+
+  function toggleCheckDocente(idDocente, marcado){
+    if(marcado) seleccionadosCheckDocentes.add(idDocente);
+    else seleccionadosCheckDocentes.delete(idDocente);
+    document.getElementById("contadorCheckDocentes").textContent =
+      seleccionadosCheckDocentes.size ? `${seleccionadosCheckDocentes.size} docente(s) seleccionado(s)` : "";
+  }
+
+  function renderListaCheckDocentes(){
+    const filtro = (document.getElementById("buscadorCheckDocentes")?.value || "").trim().toLowerCase();
+    const lista = filtro
+      ? DOCENTES.filter(d => `${d.nombres} ${d.apellidos}`.toLowerCase().includes(filtro))
+      : DOCENTES;
+    document.getElementById("listaCheckDocentes").innerHTML = lista.length ? lista.map(d => `
+      <label class="check-docente-row">
+        <input type="checkbox" value="${d.id}" ${seleccionadosCheckDocentes.has(d.id) ? "checked" : ""} onchange="toggleCheckDocente(${d.id}, this.checked)">
+        <span>${d.nombres} ${d.apellidos}</span>
       </label>
-    `).join("");
+    `).join("") : `<p style="font-size:12px;color:var(--text-muted);padding:8px;margin:0;">No se encontraron docentes con ese nombre.</p>`;
+    document.getElementById("contadorCheckDocentes").textContent =
+      seleccionadosCheckDocentes.size ? `${seleccionadosCheckDocentes.size} docente(s) seleccionado(s)` : "";
   }
 
   function abrirNueva(){
     idCapacitacionEnEdicion = null;
     document.getElementById("tituloModalForm").textContent = "Nueva capacitacion";
-    ["fTitulo","fDescripcion","fFecha","fDuracion"].forEach(id => document.getElementById(id).value = "");
-    renderCheckDocentes(null);
+    ["fTitulo","fDescripcion","fFecha","fDuracion","fInstructor","fInstructorBio","fRequisitos","fObjetivos","fTemario","fHabilidades"]
+      .forEach(id => document.getElementById(id).value = "");
+    iniciarCheckDocentes(null);
     document.getElementById("modalForm").classList.add("open");
   }
   function abrirEditar(id){
     idCapacitacionEnEdicion = id;
-    const c = CAPACITACIONES.find(x => x.id === id);
+    const c = capacitaciones.find(x => x.id === id);
+    if(!c){ showToast("No se encontro la capacitacion.", "error"); return; }
     document.getElementById("tituloModalForm").textContent = "Editar capacitacion";
     document.getElementById("fTitulo").value = c.titulo;
     document.getElementById("fDescripcion").value = c.descripcion;
@@ -197,75 +264,127 @@
     document.getElementById("fDuracion").value = c.duracion;
     document.getElementById("fSede").value = c.sede;
     document.getElementById("fPrograma").value = c.programa;
-    renderCheckDocentes(id);
+    document.getElementById("fInstructor").value = c.instructor || "";
+    document.getElementById("fInstructorBio").value = c.instructor_bio || "";
+    document.getElementById("fRequisitos").value = c.requisitos || "";
+    document.getElementById("fObjetivos").value = (c.objetivos || []).join("\n");
+    document.getElementById("fTemario").value = (c.temario || []).join("\n");
+    document.getElementById("fHabilidades").value = (c.habilidades || []).join("\n");
+    iniciarCheckDocentes(id);
     document.getElementById("modalForm").classList.add("open");
   }
-  function guardarCapacitacion(){
+  async function guardarCapacitacion(boton){
     const titulo = document.getElementById("fTitulo").value.trim();
     if(!titulo){ showToast("El titulo es obligatorio", "error"); return; }
 
     let idCap = idCapacitacionEnEdicion;
+    const capActual = idCap ? capacitaciones.find(c => c.id === idCap) : null;
+    if(idCap && !capActual){ showToast("No se encontro la capacitacion.", "error"); return; }
+
     const datos = {
       titulo,
       descripcion: document.getElementById("fDescripcion").value,
       fecha: document.getElementById("fFecha").value,
       duracion: document.getElementById("fDuracion").value,
-      estado: "activa",
+      estado: capActual ? capActual.estado : "activa",
       sede: document.getElementById("fSede").value,
-      programa: document.getElementById("fPrograma").value
+      programa: document.getElementById("fPrograma").value,
+      instructor: document.getElementById("fInstructor").value,
+      instructor_bio: document.getElementById("fInstructorBio").value,
+      requisitos: document.getElementById("fRequisitos").value,
+      objetivos: document.getElementById("fObjetivos").value,
+      temario: document.getElementById("fTemario").value,
+      habilidades: document.getElementById("fHabilidades").value
     };
 
-    if(idCap){
-      const cap = CAPACITACIONES.find(c => c.id === idCap);
-      const fechaAnterior = cap.fecha;
-      Object.assign(cap, datos);
-      // Si se reprogramo la fecha de la capacitacion, mover la fecha limite
-      // de los docentes que aun no completan por la misma cantidad de dias
-      // (preserva el margen original en vez de dejar el semaforo desincronizado
-      // del nuevo cronograma real).
-      if(datos.fecha && fechaAnterior && datos.fecha !== fechaAnterior){
-        const msPorDia = 1000 * 60 * 60 * 24;
-        const diffDias = Math.round((new Date(datos.fecha) - new Date(fechaAnterior)) / msPorDia);
-        INSCRIPCIONES.filter(i => i.id_capacitacion === idCap && i.estado !== "completada" && i.fecha_limite)
-          .forEach(i => {
-            const nuevaLimite = new Date(i.fecha_limite);
-            nuevaLimite.setDate(nuevaLimite.getDate() + diffDias);
-            i.fecha_limite = nuevaLimite.toISOString().slice(0, 10);
-          });
+    try{
+    await conEstadoCarga(boton, "Guardando...", async () => {
+      if(idCap){
+        const actualizada = await editarCapacitacionBackend(idCap, datos);
+        Object.assign(capActual, actualizada);
+      } else {
+        const creada = await crearCapacitacionBackend(datos);
+        idCap = creada.id;
+        capacitaciones.push(creada);
       }
-    } else {
-      idCap = Math.max(0, ...CAPACITACIONES.map(c => c.id)) + 1;
-      CAPACITACIONES.push({id: idCap, ...datos});
-    }
 
-    // RF-08: asignar la capacitacion a los docentes marcados
-    const marcados = Array.from(document.querySelectorAll("#listaCheckDocentes input:checked")).map(el => parseInt(el.value));
-    marcados.forEach(idDoc => {
-      const yaExiste = INSCRIPCIONES.some(i => i.id_docente === idDoc && i.id_capacitacion === idCap);
-      if(!yaExiste){
-        const nuevoId = Math.max(0, ...INSCRIPCIONES.map(i => i.id)) + 1;
-        INSCRIPCIONES.push({
-          id: nuevoId, id_docente: idDoc, id_capacitacion: idCap,
-          estado: "pendiente", fecha_inscripcion: new Date().toISOString().slice(0,10),
-          fecha_limite: datos.fecha
-        });
+      // RF-08: asignar la capacitacion a los docentes marcados. El backend
+      // ignora los que ya estaban inscritos, y editar.php ya desplazo la
+      // fecha_limite de los inscritos si se reprogramo la fecha (RN-05).
+      const marcados = Array.from(seleccionadosCheckDocentes);
+      if(marcados.length){
+        await asignarDocentesBackend(idCap, marcados);
       }
+      await listarInscripcionesBackend();
     });
 
     cerrarModales();
+    render();
     showToast("Capacitacion guardada correctamente", "success");
+    }catch(error){
+      showToast(error.message, "error");
+    }
+  }
+
+  async function cambiarEstadoCapacitacion(idCap, activo, boton){
+    const cap = capacitaciones.find(c => c.id === idCap);
+    if(!cap){ showToast("No se encontro la capacitacion.", "error"); return; }
+    const accion = activo ? "reactivar" : "desactivar";
+    if(!confirm(`Deseas ${accion} esta capacitacion?`)) return;
+
+    try{
+      const actualizada = await conEstadoCarga(boton, activo ? "Reactivando..." : "Desactivando...", () => cambiarEstadoCapacitacionBackend(idCap, activo));
+      Object.assign(cap, actualizada);
+      showToast(actualizada.activo ? "Capacitacion reactivada" : "Capacitacion desactivada", "success");
+      render();
+      renderSolicitudes();
+    }catch(error){
+      showToast(error.message, "error");
+    }
+  }
+
+  // badgeConVencimiento() vive en js/app.js (compartida con perfil.html y
+  // detalle.html del lado docente) para no duplicar la misma logica en cada
+  // pagina.
+  // Linea de fecha: si ya esta vencido, el badge de arriba ya dice "Vencido"
+  // en rojo, asi que aqui solo hace falta la fecha exacta (sin repetir la
+  // alerta). Si esta por vencer pronto (aun no vencido), aqui es donde se
+  // avisa, en ambar, porque el badge todavia muestra el progreso real.
+  function lineaFechaLimite(i, idCap){
+    if(i.estado === "completada") return "";
+    const clase = semaforoClase(i);
+    const vencido = clase === "semaforo-rojo";
+    const color = vencido ? "var(--danger)" : clase === "semaforo-ambar" ? "#9a6700" : "var(--text-muted)";
+    const icono = clase === "semaforo-ambar" ? `<i class="fa-solid fa-clock"></i> ` : "";
+    const prefijo = vencido ? "Vencio el" : clase === "semaforo-ambar" ? "Vence pronto:" : "Vence:";
+    return `
+      <div style="margin-top:3px;font-size:10.5px;font-weight:${clase === "semaforo-verde" ? "400" : "700"};color:${color};">
+        <span id="fechaLimiteTexto-${i.id}">${icono}${prefijo} ${i.fecha_limite || "sin fecha"}</span>
+        <a href="#" onclick="event.preventDefault();editarFechaLimite(${i.id})" title="Reprogramar el plazo de este docente" style="color:inherit;"><i class="fa-solid fa-pen" style="margin-left:3px;"></i></a>
+        <span id="fechaLimiteEdit-${i.id}" style="display:none;white-space:nowrap;">
+          <input type="date" id="fechaLimiteInput-${i.id}" value="${i.fecha_limite || ""}" style="font-size:11px;padding:1px 3px;border:1px solid var(--secondary);border-radius:4px;">
+          <a href="#" onclick="event.preventDefault();guardarFechaLimite(${i.id}, ${idCap}, this)" title="Guardar"><i class="fa-solid fa-check" style="color:var(--success);margin-left:3px;"></i></a>
+          <a href="#" onclick="event.preventDefault();cancelarFechaLimite(${i.id})" title="Cancelar"><i class="fa-solid fa-xmark" style="color:var(--danger);margin-left:3px;"></i></a>
+        </span>
+      </div>
+    `;
   }
 
   function abrirDocentes(idCap){
-    const cap = CAPACITACIONES.find(c => c.id === idCap);
+    const cap = capacitaciones.find(c => c.id === idCap);
+    if(!cap){ showToast("No se encontro la capacitacion.", "error"); return; }
     document.getElementById("tituloModalDocentes").textContent = "Docentes de: " + cap.titulo;
     const inscritos = INSCRIPCIONES.filter(i => i.id_capacitacion === idCap);
     document.getElementById("tablaDocentesCap").innerHTML = inscritos.map(i => `
       <tr>
-        <td>${nombreDocente(i.id_docente)}</td>
-        <td><span class="badge ${badgeClase(i.estado)}">${badgeTexto(i.estado)}</span></td>
+        <td>${nombreDocente(i.id_docente)}${i.actualizado_por ? `<div style="font-size:10.5px;color:var(--text-muted);margin-top:2px;"><i class="fa-solid fa-user-pen"></i> Actualizado por ${i.actualizado_por.nombre}</div>` : ""}</td>
+        <td>
+          ${badgeConVencimiento(i)}
+          ${lineaFechaLimite(i, idCap)}
+        </td>
         <td>
           <select onchange="actualizarEstadoInscripcion(${i.id}, this.value, ${idCap})" style="font-size:12px;padding:4px;">
+            ${i.estado === "vencida" ? `<option value="vencida" selected disabled>Vencida (automatica)</option>` : ""}
             <option value="pendiente" ${i.estado==="pendiente"?"selected":""}>Pendiente</option>
             <option value="en curso" ${i.estado==="en curso"?"selected":""}>En curso</option>
             <option value="completada" ${i.estado==="completada"?"selected":""}>Completada</option>
@@ -276,33 +395,47 @@
     document.getElementById("modalDocentes").classList.add("open");
   }
 
-  function actualizarEstadoInscripcion(idInscripcion, nuevoEstado, idCap){
-    const insc = INSCRIPCIONES.find(x => x.id === idInscripcion);
-    if(!insc) return;
-    insc.estado = nuevoEstado;
-    insc.fecha_actualizacion = new Date().toISOString().slice(0,10);
-
-    // RF-13: generar constancia automaticamente al completar (una sola vez, RN-05)
-    let constanciaNueva = false;
-    if(nuevoEstado === "completada"){
-      const yaTieneConstancia = CONSTANCIAS.some(c => c.id_inscripcion === idInscripcion);
-      if(!yaTieneConstancia){
-        const nuevoId = Math.max(0, ...CONSTANCIAS.map(c => c.id)) + 1;
-        const codigo = "CERTUS-2026-" + String(nuevoId).padStart(4, "0");
-        CONSTANCIAS.push({id: nuevoId, id_inscripcion: idInscripcion, codigo, fecha_emision: insc.fecha_actualizacion});
-        constanciaNueva = true;
-      }
+  function editarFechaLimite(idInscripcion){
+    document.getElementById(`fechaLimiteTexto-${idInscripcion}`).style.display = "none";
+    document.getElementById(`fechaLimiteEdit-${idInscripcion}`).style.display = "inline";
+  }
+  function cancelarFechaLimite(idInscripcion){
+    document.getElementById(`fechaLimiteTexto-${idInscripcion}`).style.display = "inline";
+    document.getElementById(`fechaLimiteEdit-${idInscripcion}`).style.display = "none";
+  }
+  async function guardarFechaLimite(idInscripcion, idCap, enlace){
+    const nuevaFecha = document.getElementById(`fechaLimiteInput-${idInscripcion}`).value;
+    if(!nuevaFecha){ showToast("Elige una fecha", "error"); return; }
+    try{
+      await conEstadoCarga(enlace, "", async () => {
+        await cambiarFechaLimiteBackend(idInscripcion, nuevaFecha);
+        await listarInscripcionesBackend();
+      });
+      showToast("Fecha limite actualizada para este docente", "success");
+      abrirDocentes(idCap);
+      render();
+    }catch(error){
+      showToast(error.message, "error");
     }
-    // Antes esto se guardaba en silencio: ni confirmacion del cambio ni aviso
-    // de que se emitio una constancia real. La fila del modal tampoco se
-    // refrescaba, asi que el badge quedaba desactualizado hasta reabrirlo.
-    showToast(
-      constanciaNueva
-        ? `Estado actualizado a "${badgeTexto(nuevoEstado)}" — se emitio la constancia automaticamente.`
-        : `Estado actualizado a "${badgeTexto(nuevoEstado)}".`,
-      "success"
-    );
-    if(idCap) abrirDocentes(idCap);
+  }
+
+  async function actualizarEstadoInscripcion(idInscripcion, nuevoEstado, idCap){
+    try{
+      const respuesta = await cambiarEstadoInscripcionBackend(idInscripcion, nuevoEstado);
+      await Promise.all([listarInscripcionesBackend(), listarConstanciasBackend()]);
+      // RF-13: el backend genera la constancia automaticamente al completar
+      // (una sola vez, RN-05) — aqui solo avisamos si se emitio una nueva.
+      showToast(
+        respuesta.constancia_nueva
+          ? `Estado actualizado a "${badgeTexto(nuevoEstado)}" — se emitio la constancia automaticamente.`
+          : `Estado actualizado a "${badgeTexto(nuevoEstado)}".`,
+        "success"
+      );
+      if(idCap) abrirDocentes(idCap);
+      render();
+    }catch(error){
+      showToast(error.message, "error");
+    }
   }
 
   function cerrarModales(){
@@ -312,41 +445,255 @@
   }
 
   // ===== Solicitudes de acceso a capacitaciones (MEJORA) =====
+  function normalizarSolicitudAdminBackend(solicitud){
+    const docente = solicitud.docente || {};
+    const capacitacion = solicitud.capacitacion || {};
+
+    return {
+      id: parseInt(solicitud.id, 10),
+      estado: solicitud.estado,
+      fecha_solicitud: solicitud.fecha_solicitud,
+      fecha_resolucion: solicitud.fecha_resolucion,
+      docente: {
+        id: parseInt(docente.id, 10),
+        nombres: docente.nombres || "",
+        apellidos: docente.apellidos || "",
+        correo: docente.correo || ""
+      },
+      capacitacion: {
+        id: parseInt(capacitacion.id, 10),
+        titulo: capacitacion.titulo || "Capacitacion eliminada"
+      }
+    };
+  }
+
+  async function listarSolicitudesAdminBackend(){
+    const respuesta = await fetch("../api/solicitudes/listar.php", {
+      credentials: "same-origin",
+      headers: { "Accept": "application/json" }
+    });
+    let datos = null;
+
+    try{
+      datos = await respuesta.json();
+    }catch(e){
+      datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+    }
+
+    if(respuesta.status === 401 || respuesta.status === 403){
+      try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+      if(respuesta.status === 401){
+        window.location.replace(rutaLoginCertus());
+      }
+    }
+
+    if(!respuesta.ok || !datos.ok){
+      throw new Error(datos.mensaje || "No se pudieron cargar las solicitudes.");
+    }
+
+    return (datos.solicitudes || []).map(normalizarSolicitudAdminBackend);
+  }
+
+  async function aprobarSolicitudBackend(idSolicitud){
+    const respuesta = await fetch("../api/solicitudes/aprobar.php", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ id_solicitud: idSolicitud })
+    });
+    let datos = null;
+
+    try{
+      datos = await respuesta.json();
+    }catch(e){
+      datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+    }
+
+    if(respuesta.status === 401 || respuesta.status === 403){
+      try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+      if(respuesta.status === 401){
+        window.location.replace(rutaLoginCertus());
+      }
+    }
+
+    if(!respuesta.ok || !datos.ok){
+      const error = new Error(datos.mensaje || "No se pudo aprobar la solicitud.");
+      error.status = respuesta.status;
+      throw error;
+    }
+
+    return datos;
+  }
+
+  async function rechazarSolicitudBackend(idSolicitud){
+    const respuesta = await fetch("../api/solicitudes/rechazar.php", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ id_solicitud: idSolicitud })
+    });
+    let datos = null;
+
+    try{
+      datos = await respuesta.json();
+    }catch(e){
+      datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+    }
+
+    if(respuesta.status === 401 || respuesta.status === 403){
+      try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+      if(respuesta.status === 401){
+        window.location.replace(rutaLoginCertus());
+      }
+    }
+
+    if(!respuesta.ok || !datos.ok){
+      const error = new Error(datos.mensaje || "No se pudo rechazar la solicitud.");
+      error.status = respuesta.status;
+      throw error;
+    }
+
+    return datos;
+  }
+
   function renderSolicitudes(){
-    const pendientes = todasLasSolicitudesPendientes();
+    const pendientes = solicitudesCapacitacion.filter(s => s.estado === "pendiente");
     const card = document.getElementById("cardSolicitudes");
-    if(pendientes.length === 0){ card.style.display = "none"; return; }
+    if(pendientes.length === 0){
+      card.style.display = "none";
+      document.getElementById("listaSolicitudesAdmin").innerHTML = "";
+      return;
+    }
     card.style.display = "block";
-    document.getElementById("listaSolicitudesAdmin").innerHTML = pendientes.map(s => {
-      const cap = CAPACITACIONES.find(c => c.id === s.id_capacitacion);
-      return `
+    document.getElementById("listaSolicitudesAdmin").innerHTML = pendientes.map(s => `
         <div class="review-item">
           <div class="r-head">
-            <span>${cap ? cap.titulo : "Capacitacion eliminada"} · <span style="font-weight:400;color:var(--text-muted);">${nombreDocente(s.id_docente)}</span></span>
+            <span>${s.capacitacion.titulo} · <span style="font-weight:400;color:var(--text-muted);">${s.docente.nombres} ${s.docente.apellidos}</span></span>
             <span class="badge badge-pendiente">Pendiente</span>
           </div>
-          <p style="font-size:12px;color:var(--text-muted);">Solicitada el ${s.fecha_solicitud}</p>
+          <p style="font-size:12px;color:var(--text-muted);">Solicitada el ${s.fecha_solicitud} · ${s.docente.correo}</p>
           <div style="display:flex;gap:8px;margin-top:6px;">
-            <button class="btn btn-primary btn-sm" onclick="aprobarSolicitud(${s.id})"><i class="fa-solid fa-check"></i> Aprobar</button>
-            <button class="btn btn-outline btn-sm" onclick="rechazarSolicitud(${s.id})"><i class="fa-solid fa-xmark"></i> Rechazar</button>
+            <button class="btn btn-primary btn-sm" onclick="aprobarSolicitud(${s.id}, this)"><i class="fa-solid fa-check"></i> Aprobar</button>
+            <button class="btn btn-outline btn-sm" onclick="rechazarSolicitud(${s.id}, this)"><i class="fa-solid fa-xmark"></i> Rechazar</button>
           </div>
         </div>
-      `;
-    }).join("");
+      `).join("");
   }
-  renderSolicitudes();
+  async function aprobarSolicitud(idSolicitud, boton){
+    try{
+      await conEstadoCarga(boton, "Aprobando...", () => aprobarSolicitudBackend(idSolicitud));
+      solicitudesCapacitacion = await listarSolicitudesAdminBackend();
+      renderSolicitudes();
+      showToast("Solicitud aprobada correctamente. Se creo la inscripcion del docente.", "success");
+    }catch(error){
+      if(error.status === 409){
+        showToast(error.message || "La solicitud ya fue resuelta.", "error");
+        try{
+          solicitudesCapacitacion = await listarSolicitudesAdminBackend();
+          renderSolicitudes();
+        }catch(e){}
+      } else if(error.status === 404){
+        showToast(error.message || "Solicitud no encontrada.", "error");
+      } else if(error.status === 422){
+        showToast(error.message || "Solicitud invalida.", "error");
+      } else if(error.status !== 401){
+        showToast(error.message || "No se pudo aprobar la solicitud.", "error");
+      }
+    }
+  }
+  async function rechazarSolicitud(idSolicitud, boton){
+    try{
+      await conEstadoCarga(boton, "Rechazando...", () => rechazarSolicitudBackend(idSolicitud));
+      solicitudesCapacitacion = await listarSolicitudesAdminBackend();
+      renderSolicitudes();
+      showToast("Solicitud rechazada correctamente.", "success");
+    }catch(error){
+      if(error.status === 409){
+        showToast(error.message || "La solicitud ya fue resuelta.", "error");
+        try{
+          solicitudesCapacitacion = await listarSolicitudesAdminBackend();
+          renderSolicitudes();
+        }catch(e){}
+      } else if(error.status === 404){
+        showToast(error.message || "Solicitud no encontrada.", "error");
+      } else if(error.status === 422){
+        showToast(error.message || "Solicitud invalida.", "error");
+      } else if(error.status !== 401){
+        showToast(error.message || "No se pudo rechazar la solicitud.", "error");
+      }
+    }
+  }
 
-  function aprobarSolicitud(idSolicitud){
-    const sesion = getSesionActiva();
-    aprobarSolicitudCapacitacion(idSolicitud, (sesion||{}).nombre || "Admin");
-    showToast("Solicitud aprobada. Se creo la inscripcion del docente.", "success");
-    renderSolicitudes();
-    render();
+  // ===== Solicitudes de ampliacion de plazo (logica de gestion de vencidas) =====
+  // A diferencia de las solicitudes de acceso (arriba), aprobar esta exige
+  // ademas elegir una nueva fecha limite -- por eso cada fila trae su propio
+  // input de fecha en vez de solo un boton.
+  function renderSolicitudesAmpliacion(){
+    const pendientes = todasLasSolicitudesAmpliacionPendientes();
+    const card = document.getElementById("cardAmpliacion");
+    if(pendientes.length === 0){
+      card.style.display = "none";
+      document.getElementById("listaAmpliacionAdmin").innerHTML = "";
+      return;
+    }
+    card.style.display = "block";
+    document.getElementById("listaAmpliacionAdmin").innerHTML = pendientes.map(s => `
+        <div class="review-item">
+          <div class="r-head">
+            <span>${s.capacitacion.titulo} · <span style="font-weight:400;color:var(--text-muted);">${s.docente ? `${s.docente.nombres} ${s.docente.apellidos}` : "-"}</span></span>
+            <span class="badge badge-vencido">Vencida</span>
+          </div>
+          <p style="margin-bottom:6px;">${s.motivo}</p>
+          <p style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Solicitada el ${s.fecha_solicitud} · plazo anterior: ${s.inscripcion.fecha_limite || "sin fecha"}</p>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="date" id="ampliacionFecha-${s.id}" style="font-size:12px;padding:4px 6px;border:1px solid var(--secondary);border-radius:6px;">
+            <button class="btn btn-primary btn-sm" onclick="aprobarSolicitudAmpliacion(${s.id}, this)"><i class="fa-solid fa-check"></i> Aprobar</button>
+            <button class="btn btn-outline btn-sm" onclick="rechazarSolicitudAmpliacion(${s.id}, this)"><i class="fa-solid fa-xmark"></i> Rechazar</button>
+          </div>
+        </div>
+      `).join("");
   }
-  function rechazarSolicitud(idSolicitud){
-    rechazarSolicitudCapacitacion(idSolicitud);
-    showToast("Solicitud rechazada", "success");
-    renderSolicitudes();
+  async function aprobarSolicitudAmpliacion(idSolicitud, boton){
+    const input = document.getElementById(`ampliacionFecha-${idSolicitud}`);
+    const nuevaFecha = input ? input.value : "";
+    if(!nuevaFecha){ showToast("Elige la nueva fecha limite antes de aprobar", "error"); return; }
+    try{
+      await conEstadoCarga(boton, "Aprobando...", () => aprobarSolicitudAmpliacionBackend(idSolicitud, nuevaFecha));
+      await Promise.all([listarSolicitudesAmpliacionBackend(), listarInscripcionesBackend()]);
+      renderSolicitudesAmpliacion();
+      render();
+      showToast("Solicitud aprobada. Nueva fecha limite aplicada.", "success");
+    }catch(error){
+      if(error.status === 409){
+        showToast(error.message || "La solicitud ya fue resuelta.", "error");
+        await listarSolicitudesAmpliacionBackend();
+        renderSolicitudesAmpliacion();
+      } else if(error.status !== 401){
+        showToast(error.message || "No se pudo aprobar la solicitud.", "error");
+      }
+    }
+  }
+  async function rechazarSolicitudAmpliacion(idSolicitud, boton){
+    try{
+      await conEstadoCarga(boton, "Rechazando...", () => rechazarSolicitudAmpliacionBackend(idSolicitud, ""));
+      await listarSolicitudesAmpliacionBackend();
+      renderSolicitudesAmpliacion();
+      showToast("Solicitud rechazada. La capacitacion sigue vencida.", "success");
+    }catch(error){
+      if(error.status === 409){
+        showToast(error.message || "La solicitud ya fue resuelta.", "error");
+        await listarSolicitudesAmpliacionBackend();
+        renderSolicitudesAmpliacion();
+      } else if(error.status !== 401){
+        showToast(error.message || "No se pudo rechazar la solicitud.", "error");
+      }
+    }
   }
 
   // ===== Sugerencias de los docentes (MEJORA — needs assessment) =====
@@ -365,23 +712,64 @@
         ${s.estado !== "atendida" ? `
           <div style="display:flex;gap:8px;margin-top:6px;">
             <button class="btn btn-outline btn-sm" onclick="crearDesdeSugerencia('${s.titulo.replace(/'/g,"")}')"><i class="fa-solid fa-plus"></i> Crear capacitacion</button>
-            <button class="btn btn-outline btn-sm" onclick="atenderSugerencia(${s.id_docente}, ${s.id})"><i class="fa-solid fa-check"></i> Marcar atendida</button>
+            <button class="btn btn-outline btn-sm" onclick="atenderSugerencia(${s.id_docente}, ${s.id}, this)"><i class="fa-solid fa-check"></i> Marcar atendida</button>
           </div>
         ` : ""}
       </div>
     `).join("");
   }
-  renderSugerencias();
-
-  function atenderSugerencia(idDocente, idSugerencia){
-    marcarSugerenciaAtendida(idDocente, idSugerencia);
-    showToast("Sugerencia marcada como atendida", "success");
-    renderSugerencias();
+  async function atenderSugerencia(idDocente, idSugerencia, boton){
+    try{
+      await conEstadoCarga(boton, "Guardando...", async () => {
+        await marcarSugerenciaAtendidaBackend(idSugerencia);
+        await listarSugerenciasBackend();
+      });
+      showToast("Sugerencia marcada como atendida", "success");
+      renderSugerencias();
+    }catch(error){
+      showToast(error.message || "No se pudo marcar la sugerencia.", "error");
+    }
   }
   function crearDesdeSugerencia(titulo){
     abrirNueva();
     document.getElementById("fTitulo").value = titulo;
   }
+
+  async function cargarCapacitacionesAdmin(){
+    try{
+      await Promise.all([listarDocentesBackend(), listarInscripcionesBackend(), listarConstanciasBackend(), listarSugerenciasBackend(), listarSolicitudesAmpliacionBackend()]);
+      capacitaciones = await listarCapacitacionesBackend();
+      solicitudesCapacitacion = await listarSolicitudesAdminBackend();
+      render();
+      renderSolicitudes();
+      renderSolicitudesAmpliacion();
+      renderSugerencias();
+
+      // Deep-link desde el Dashboard ("Semaforo de cumplimiento" -> "Gestionar"):
+      // en vez de obligar al admin a buscar la capacitacion en la tabla
+      // (paginada, con 12+ filas), ?docentes=ID abre directo el modal de esa
+      // capacitacion especifica.
+      const idDocentesURL = parseInt(new URLSearchParams(window.location.search).get("docentes"), 10);
+      if(Number.isInteger(idDocentesURL) && capacitaciones.some(c => c.id === idDocentesURL)){
+        abrirDocentes(idDocentesURL);
+      }
+    }catch(error){
+      document.getElementById("tablaCapacitaciones").innerHTML =
+        `<tr><td colspan="7" style="text-align:center;color:#c62828;">${error.message}</td></tr>`;
+    }
+  }
+
+  document.getElementById("buscadorCapacitaciones").addEventListener("input", (e) => {
+    filtroCapacitaciones = e.target.value.trim().toLowerCase();
+    paginaActualCapacitaciones = 1;
+    render();
+  });
+
+  document.getElementById("buscadorCheckDocentes").addEventListener("input", () => {
+    renderListaCheckDocentes();
+  });
+
+  cargarCapacitacionesAdmin();
 </script>
 </body>
 </html>

@@ -1,9 +1,8 @@
 // ============================================================
-// DATOS — CERTUS (carpeta de arranque para el equipo)
-// Esta carpeta solo tiene la pantalla de login como punto de partida
-// visual, para que el equipo vea el flujo antes de construir el resto.
-// Todos los arreglos empiezan vacios a proposito: no hay docentes,
-// administradores, capacitaciones ni nada cargado todavia.
+// DATOS — CERTUS
+// Todos los arreglos empiezan vacios: se llenan con datos reales de la
+// base de datos via los loaders de app.js (listarDocentesBackend(),
+// listarCapacitacionesBackend(), etc.) en cada pagina que los necesita.
 // ============================================================
 
 const DOCENTES = [];
@@ -14,23 +13,75 @@ const CONSTANCIAS = [];
 const INSIGNIAS = [];
 const MENTORES = [];
 const SESIONES_MENTORIA = [];
+const SESIONES_COMO_MENTOR = [];
 const AUTOEVALUACIONES = [];
 const PLANES_DESARROLLO = [];
 const EVIDENCIAS_INSIGNIA = [];
 const SUGERENCIAS_CAPACITACION = [];
+const SOLICITUDES_CAPACITACION = [];
+const CICLOS_CONFIRMACION = [];
+const SOLICITUDES_AMPLIACION = [];
 
 function getSesionActiva(){
-  const raw = sessionStorage.getItem("sesion_certus");
-  if(raw) return JSON.parse(raw);
-  // Sin sistema de sesion todavia (login.html no guarda nada en
-  // sessionStorage) -- usamos una sesion de prueba segun la carpeta actual
-  // (docente/ o admin/) para que el navbar y el contenido se vean completos
-  // (iconos incluidos) mientras se conecta el login real.
-  const esAdmin = location.pathname.includes("/admin/");
-  return esAdmin
-    ? { rol: "admin", id: 1, nombre: "Administrador" }
-    : { rol: "docente", id: 1, nombre: "Docente" };
+  if(window.__sesionCertusCache) return window.__sesionCertusCache;
+
+  try{
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", rutaBackendCertus("sesion.php"), false);
+    xhr.setRequestHeader("Accept", "application/json");
+    xhr.send(null);
+
+    if(xhr.status >= 200 && xhr.status < 300){
+      const datos = JSON.parse(xhr.responseText);
+      if(datos.ok && datos.usuario){
+        window.__sesionCertusCache = datos.usuario;
+        return window.__sesionCertusCache;
+      }
+    }
+  }catch(e){}
+
+  return null;
 }
 function requireSesion(rolEsperado){
-  return getSesionActiva();
+  const sesion = getSesionActiva();
+
+  if(!sesion || (rolEsperado && sesion.rol !== rolEsperado)){
+    try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+    window.location.replace(rutaLoginCertus());
+    throw new Error("Sesion no valida.");
+  }
+
+  return sesion;
 }
+
+function rutaBackendCertus(archivo){
+  return estaEnSubcarpetaProtegida() ? `../${archivo}` : archivo;
+}
+
+function rutaLoginCertus(){
+  return estaEnSubcarpetaProtegida() ? "../login.html" : "login.html";
+}
+
+function estaEnSubcarpetaProtegida(){
+  return location.pathname.includes("/docente/") || location.pathname.includes("/admin/");
+}
+
+function rolEsperadoPorRutaCertus(){
+  if(location.pathname.includes("/admin/")) return "admin";
+  if(location.pathname.includes("/docente/")) return "docente";
+  return null;
+}
+
+window.addEventListener("pageshow", (event) => {
+  if(!event.persisted) return;
+
+  const rolEsperado = rolEsperadoPorRutaCertus();
+  if(!rolEsperado) return;
+
+  window.__sesionCertusCache = null;
+  const sesion = getSesionActiva();
+
+  if(!sesion || sesion.rol !== rolEsperado){
+    window.location.replace(rutaLoginCertus());
+  }
+});

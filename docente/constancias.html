@@ -5,23 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,500;0,700;1,400&family=Great+Vibes&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="icon" type="image/x-icon" href="../img/favicon_certus.ico">
 
 <title>CERTUS | Constancias</title>
-<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="../css/theme.css">
 </head>
 <body>
 <div class="app">
   <nav class="topnav">
     <div class="topnav-left"><img src="../img/certus_logo.png" alt="CERTUS" class="brand-logo"><span class="brand-divider"></span><span class="brand-label">Panel Docente</span></div>
     <div class="topnav-links">
-      <a href="perfil.html">Perfil</a>
       <a href="mis_capacitaciones.html">Mis capacitaciones</a>
       <a href="constancias.html" class="active">Constancias</a>
       <a href="mi_progreso.html">Mi progreso</a>
       <a href="mentores.html">Mentores</a>
+      <a href="perfil.html">Perfil</a>
     </div>
     <div class="topnav-right" id="topnavRight"></div>
   </nav>
@@ -42,13 +42,43 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="../js/data.js"></script>
-<script src="../js/app.js"></script>
+<script src="../js/data.js?v=20260916n"></script>
+<script src="../js/app.js?v=20260916n"></script>
 <script>
+(async function(){
   const sesion = requireSesion("docente");
-  const docente = DOCENTES.find(d => d.id === sesion.id);
 
-  const misInscripcionesCompletadas = INSCRIPCIONES.filter(i => i.id_docente === sesion.id && i.estado === "completada");
+  async function obtenerMiDocente(){
+    try{
+      const respuesta = await fetch(rutaBackendCertus("obtener_docente.php"), {
+        credentials: "same-origin",
+        headers: { "Accept": "application/json" }
+      });
+      const datos = await respuesta.json();
+      if(datos.ok) return datos.docente;
+    }catch(e){}
+    const [nombres, ...resto] = (sesion.nombre || "Docente").trim().split(/\s+/);
+    return { nombres, apellidos: resto.join(" ") || "-" };
+  }
+
+  async function misInscripcionesDocente(){
+    try{
+      const respuesta = await fetch(rutaBackendCertus("api/inscripciones/mis_inscripciones.php"), {
+        credentials: "same-origin",
+        headers: { "Accept": "application/json" }
+      });
+      const datos = await respuesta.json();
+      return datos.ok ? (datos.inscripciones || []) : [];
+    }catch(e){
+      return [];
+    }
+  }
+
+  const [docente, misInscripciones] = await Promise.all([obtenerMiDocente(), misInscripcionesDocente()]);
+  let misConstancias = [];
+  try{ misConstancias = await misConstanciasBackend(); }catch(e){ misConstancias = []; }
+
+  const misInscripcionesCompletadas = misInscripciones.filter(i => i.estado === "completada");
 
   if(misInscripcionesCompletadas.length === 0){
     document.getElementById("listaConstancias").innerHTML = `
@@ -59,8 +89,8 @@
   }
 
   document.getElementById("listaConstancias").innerHTML = misInscripcionesCompletadas.map((i, idx) => {
-    const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
-    const constancia = CONSTANCIAS.find(c => c.id_inscripcion === i.id) || {codigo:"CERTUS-PENDIENTE", fecha_emision:"-"};
+    const cap = i.capacitacion || {};
+    const constancia = misConstancias.find(c => c.id_inscripcion === i.id) || {codigo:"CERTUS-PENDIENTE", fecha_emision:"-"};
     return `
       <div class="constancia-preview" style="animation-delay:${idx * .06}s;" onclick="abrirConstancia(${i.id})">
         <div class="ribbon"><i class="fa-solid fa-award"></i></div>
@@ -73,34 +103,41 @@
   }).join("");
 
   function abrirConstancia(idInscripcion){
-    const i = INSCRIPCIONES.find(x => x.id === idInscripcion);
-    const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
-    const constancia = CONSTANCIAS.find(c => c.id_inscripcion === i.id) || {codigo:"CERTUS-PENDIENTE", fecha_emision:"-"};
+    const i = misInscripciones.find(x => x.id === idInscripcion);
+    const cap = i.capacitacion || {};
+    const constancia = misConstancias.find(c => c.id_inscripcion === i.id) || {codigo:"CERTUS-PENDIENTE", fecha_emision:"-"};
 
     document.getElementById("diplomaModalBox").innerHTML = `
       <div class="diploma">
-        <div class="diploma-head">
-          <div class="diploma-brandmark"><span class="diploma-logo-chip"><img src="../img/certus_logo.png" alt="CERTUS"></span></div>
-          <span class="diploma-tag">Constancia de finalizacion</span>
-          <div class="diploma-nombre">${docente.nombres} ${docente.apellidos}</div>
-          <p class="diploma-sub">Ha completado satisfactoriamente el programa de capacitacion docente detallado a continuacion, cumpliendo con los requisitos academicos establecidos por CERTUS.</p>
-        </div>
-        <div class="diploma-titulo">"${cap.titulo}"</div>
-        <div class="diploma-meta">
-          <div><span>Duracion</span><b>${cap.duracion}</b></div>
-          <div><span>Sede</span><b>${cap.sede}</b></div>
-          <div><span>Emitida el</span><b>${constancia.fecha_emision}</b></div>
-        </div>
-        <div class="diploma-footer">
-          <div class="diploma-firma">
-            <div class="linea"></div>
-            Direccion Academica<br><b>Instituto CERTUS</b>
-          </div>
+        <div class="diploma-side">
+          <div class="diploma-side-bar top"></div>
           <div class="diploma-seal"><i class="fa-solid fa-award"></i></div>
-          <div class="diploma-qr">
-            <div id="qr-modal"></div>
-            <small>Verificar autenticidad</small>
-            <div class="codigo">${constancia.codigo}</div>
+          <div class="diploma-side-bar bottom"></div>
+        </div>
+        <div class="diploma-content">
+          <div class="diploma-banner-wrap"><div class="diploma-banner">Constancia de finalizacion</div></div>
+          <div class="diploma-head">
+            <p class="diploma-intro">Este certificado acredita que</p>
+            <div class="diploma-nombre">${docente.nombres} ${docente.apellidos}</div>
+            <p class="diploma-intro">ha completado satisfactoriamente el programa de capacitacion docente</p>
+            <div class="diploma-titulo">"${cap.titulo}"</div>
+            <p class="diploma-sub">Cumpliendo con los requisitos academicos establecidos por CERTUS.</p>
+          </div>
+          <div class="diploma-meta">
+            <div><span>Duracion</span><b>${cap.duracion}</b></div>
+            <div><span>Sede</span><b>${cap.sede}</b></div>
+            <div><span>Emitida el</span><b>${constancia.fecha_emision}</b></div>
+          </div>
+          <div class="diploma-footer">
+            <div class="diploma-emisor">
+              <div class="linea"></div>
+              Emitida por<br><b>Instituto CERTUS</b>
+            </div>
+            <div class="diploma-qr">
+              <div id="qr-modal"></div>
+              <small>Verificar autenticidad</small>
+              <div class="codigo">${constancia.codigo}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -132,8 +169,8 @@
   // RF-14: descarga real de la constancia en PDF (no simulada), generada
   // en el navegador a partir del propio diseno del diploma (html2canvas + jsPDF).
   async function descargarPDF(idInscripcion){
-    const i = INSCRIPCIONES.find(x => x.id === idInscripcion);
-    const constancia = CONSTANCIAS.find(c => c.id_inscripcion === i.id) || {codigo:"CERTUS-PENDIENTE"};
+    const i = misInscripciones.find(x => x.id === idInscripcion);
+    const constancia = misConstancias.find(c => c.id_inscripcion === i.id) || {codigo:"CERTUS-PENDIENTE"};
     const el = document.querySelector("#diplomaModalBox .diploma");
     const btn = document.getElementById("btnDescargarPDF");
     if(!el || typeof html2canvas === "undefined" || !window.jspdf){
@@ -153,22 +190,55 @@
     // capturar para que el diploma quede siempre en su estado final.
     const animacionOriginal = el.style.animation;
     el.style.animation = "none";
+
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
     await new Promise(r => setTimeout(r, 80));
+    // El nombre usa una fuente cursiva (Great Vibes) cargada por red -- sin
+    // esperar a que termine de cargar, html2canvas podia capturar el diploma
+    // todavia con la fuente de reemplazo del navegador en vez de la cursiva.
+    if(document.fonts && document.fonts.ready){
+      try{ await document.fonts.ready; }catch(e){}
+    }
 
     try{
-      const canvas = await html2canvas(el, { scale: 2, backgroundColor: "#ffffff" });
+      const canvas = await html2canvas(el, { scale: 2, backgroundColor: "#FDFCFA", useCORS: true });
       const imgData = canvas.toDataURL("image/png");
       const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({
-        orientation: canvas.width >= canvas.height ? "landscape" : "portrait",
-        unit: "px",
-        format: [canvas.width, canvas.height]
-      });
-      pdf.addImage(imgData, "PNG", 0, 0, canvas.width, canvas.height);
+
+      // BUG real encontrado: el PDF se generaba con el ancho/alto exacto del
+      // canvas en pixeles como tamano de pagina (unit:"px", format:[canvas.width,
+      // canvas.height]) -- con scale:2 de html2canvas eso da una "hoja" de
+      // ~1500-1800px, que la mayoria de lectores de PDF interpretan como una
+      // pagina fisica enorme (varias veces el tamano de una hoja real). Ahora
+      // se usa una pagina A4 estandar y la imagen se escala para caber dentro,
+      // centrada y con margen, como cualquier PDF descargable normal.
+      const orientacion = canvas.width >= canvas.height ? "landscape" : "portrait";
+      const pdf = new jsPDF({ orientation: orientacion, unit: "mm", format: "a4" });
+      const anchoPagina = pdf.internal.pageSize.getWidth();
+      const altoPagina = pdf.internal.pageSize.getHeight();
+      // Antes tenia 12mm de margen: dejaba un marco blanco alrededor del
+      // diploma en el PDF descargado. El diseno del diploma ya trae su propio
+      // borde/marco decorativo, asi que se quita el margen extra para que la
+      // imagen llene toda la hoja.
+      const margen = 0;
+      const anchoMax = anchoPagina - margen * 2;
+      const altoMax = altoPagina - margen * 2;
+      const proporcion = canvas.width / canvas.height;
+
+      let anchoFinal = anchoMax;
+      let altoFinal = anchoFinal / proporcion;
+      if(altoFinal > altoMax){
+        altoFinal = altoMax;
+        anchoFinal = altoFinal * proporcion;
+      }
+      const x = (anchoPagina - anchoFinal) / 2;
+      const y = (altoPagina - altoFinal) / 2;
+
+      pdf.addImage(imgData, "PNG", x, y, anchoFinal, altoFinal);
       pdf.save(`constancia-${constancia.codigo}.pdf`);
       showToast("PDF descargado correctamente", "success");
     } catch(err){
+      console.error("Error generando el PDF de la constancia:", err);
       showToast("Ocurrio un error generando el PDF", "error");
     } finally {
       el.style.animation = animacionOriginal;
@@ -176,6 +246,13 @@
       btn.disabled = false;
     }
   }
+
+  // Funciones usadas en onclick="..." del HTML -- deben quedar en window
+  // porque esta pagina corre dentro de un IIFE async.
+  window.abrirConstancia = abrirConstancia;
+  window.cerrarDiploma = cerrarDiploma;
+  window.descargarPDF = descargarPDF;
+})();
 </script>
 </body>
 </html>

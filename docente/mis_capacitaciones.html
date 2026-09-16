@@ -10,18 +10,18 @@
 <link rel="icon" type="image/x-icon" href="../img/favicon_certus.ico">
 
 <title>CERTUS | Mis capacitaciones</title>
-<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="../css/theme.css">
 </head>
 <body>
 <div class="app">
   <nav class="topnav">
     <div class="topnav-left"><img src="../img/certus_logo.png" alt="CERTUS" class="brand-logo"><span class="brand-divider"></span><span class="brand-label">Panel Docente</span></div>
     <div class="topnav-links">
-      <a href="perfil.html">Perfil</a>
       <a href="mis_capacitaciones.html" class="active">Mis capacitaciones</a>
       <a href="constancias.html">Constancias</a>
       <a href="mi_progreso.html">Mi progreso</a>
       <a href="mentores.html">Mentores</a>
+      <a href="perfil.html">Perfil</a>
     </div>
     <div class="topnav-right" id="topnavRight"></div>
   </nav>
@@ -35,9 +35,10 @@
       <button class="chip active" data-estado="todas">Todas</button>
       <button class="chip" data-estado="pendiente">Pendiente</button>
       <button class="chip" data-estado="en curso">En curso</button>
+      <button class="chip" data-estado="vencida">Vencida</button>
       <button class="chip" data-estado="completada">Completada</button>
     </div>
-    <div class="search-box"><i class="fa-solid fa-magnifying-glass"></i><input type="text" placeholder="Buscar capacitacion..." id="buscador"></div>
+    <div class="search-box"><i class="fa-solid fa-magnifying-glass"></i><label for="buscador" class="visually-hidden">Buscar capacitacion</label><input type="text" placeholder="Buscar capacitacion..." id="buscador" aria-label="Buscar capacitacion"></div>
 
     <div id="listaCapacitaciones"></div>
 
@@ -76,48 +77,192 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.9.2/confetti.browser.min.js"></script>
-<script src="../js/data.js"></script>
-<script src="../js/app.js"></script>
+<script src="../js/data.js?v=20260916n"></script>
+<script src="../js/app.js?v=20260916n"></script>
 <script>
   const sesion = requireSesion("docente");
 
-  const misInscripciones = INSCRIPCIONES.filter(i => i.id_docente === sesion.id);
+  let capacitaciones = [];
+  let misInscripciones = [];
+  let misSolicitudes = [];
+  let disponibles = [];
+  const solicitudesEnProceso = new Set();
+
+  function capacitacionPorId(id){
+    return capacitaciones.find(c => c.id === id);
+  }
+
+  function inscripcionPorId(id){
+    return misInscripciones.find(i => i.id === id);
+  }
+
+  function normalizarInscripcionBackend(inscripcion){
+    const cap = inscripcion.capacitacion || {};
+    const idCapacitacion = parseInt(cap.id, 10);
+
+    return {
+      id: parseInt(inscripcion.id, 10),
+      id_capacitacion: idCapacitacion,
+      estado: inscripcion.estado,
+      fecha_inscripcion: inscripcion.fecha_inscripcion,
+      fecha_limite: inscripcion.fecha_limite || cap.fecha || "",
+      fecha_actualizacion: inscripcion.fecha_actualizacion,
+      capacitacion: {
+        ...cap,
+        id: idCapacitacion
+      }
+    };
+  }
+
+  async function listarMisInscripcionesBackend(){
+    const respuesta = await fetch("../api/inscripciones/mis_inscripciones.php", {
+      credentials: "same-origin",
+      headers: { "Accept": "application/json" }
+    });
+    let datos = null;
+
+    try{
+      datos = await respuesta.json();
+    }catch(e){
+      datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+    }
+
+    if(respuesta.status === 401 || respuesta.status === 403){
+      try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+      if(respuesta.status === 401){
+        window.location.replace(rutaLoginCertus());
+      }
+    }
+
+    if(!respuesta.ok || !datos.ok){
+      throw new Error(datos.mensaje || "No se pudieron cargar tus inscripciones.");
+    }
+
+    return (datos.inscripciones || []).map(normalizarInscripcionBackend);
+  }
+
+  function normalizarSolicitudBackend(solicitud){
+    const cap = solicitud.capacitacion || {};
+    const idCapacitacion = parseInt(cap.id, 10);
+
+    return {
+      id: parseInt(solicitud.id, 10),
+      id_capacitacion: idCapacitacion,
+      estado: solicitud.estado,
+      fecha_solicitud: solicitud.fecha_solicitud,
+      fecha_resolucion: solicitud.fecha_resolucion,
+      capacitacion: {
+        ...cap,
+        id: idCapacitacion
+      }
+    };
+  }
+
+  async function apiSolicitudesDocente(ruta, opciones){
+    const respuesta = await fetch(`../api/solicitudes/${ruta}`, {
+      credentials: "same-origin",
+      headers: { "Accept": "application/json" },
+      ...(opciones || {})
+    });
+    let datos = null;
+
+    try{
+      datos = await respuesta.json();
+    }catch(e){
+      datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+    }
+
+    if(respuesta.status === 401 || respuesta.status === 403){
+      try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+      if(respuesta.status === 401){
+        window.location.replace(rutaLoginCertus());
+      }
+    }
+
+    if(!respuesta.ok || !datos.ok){
+      const error = new Error(datos.mensaje || "No se pudo completar la operacion.");
+      error.status = respuesta.status;
+      throw error;
+    }
+
+    return datos;
+  }
+
+  async function listarMisSolicitudesBackend(){
+    const datos = await apiSolicitudesDocente("mis_solicitudes.php");
+    return (datos.solicitudes || []).map(normalizarSolicitudBackend);
+  }
+
+  async function crearSolicitudBackend(idCapacitacion){
+    const datos = await apiSolicitudesDocente("crear.php", {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ id_capacitacion: idCapacitacion })
+    });
+
+    return normalizarSolicitudBackend(datos.solicitud);
+  }
+
+  function solicitudPorCapacitacion(idCap){
+    return misSolicitudes.find(s => s.id_capacitacion === idCap) || null;
+  }
 
   function render(){
-    document.getElementById("listaCapacitaciones").innerHTML = misInscripciones.map(i => {
-      const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
+    document.getElementById("listaCapacitaciones").innerHTML = misInscripciones.length ? misInscripciones.map(i => {
+      const cap = capacitacionPorId(i.id_capacitacion) || i.capacitacion;
+      if(!cap){
+        return `<div class="card" data-estado="${i.estado}" style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <b>Capacitacion no disponible</b><br>
+            <span style="font-size:12px;color:#6a737b;">ID ${i.id_capacitacion}</span>
+          </div>
+          <span class="badge ${badgeClase(i.estado)}">${badgeTexto(i.estado)}</span>
+        </div>`;
+      }
+      // Antes el boton decia "Ver" (mas corto) solo para completadas y "Ver
+      // detalle" para el resto -- eso hacia que el badge de cada fila
+      // arrancara en una posicion distinta segun cuanto ocupara el boton de
+      // al lado (todo el grupo se alinea a la derecha), y la columna de
+      // badges se veia escalonada/desordenada en vez de pareja. Se unifica
+      // el texto del boton y se le da un ancho fijo al badge para que la
+      // columna quede realmente alineada.
       const accion = i.estado === "completada"
-        ? `<button class="btn btn-outline btn-sm" onclick="verCompletada(${i.id})"><i class="fa-solid fa-eye"></i> Ver</button>`
-        : `<a href="detalle.html?id=${i.id}" class="btn btn-outline btn-sm"><i class="fa-solid fa-eye"></i> Ver detalle</a>`;
+        ? `<button class="btn btn-outline btn-sm" onclick="verCompletada(${i.id})"><i class="fa-solid fa-eye"></i> Ver detalle</button>`
+        : `<a href="detalle.html?capacitacion=${cap.id}" class="btn btn-outline btn-sm"><i class="fa-solid fa-eye"></i> Ver detalle</a>`;
       return `<div class="card" data-estado="${i.estado}" style="display:flex;justify-content:space-between;align-items:center;">
         <div>
           <b>${cap.titulo}</b><br>
           <span style="font-size:12px;color:#6a737b;">${cap.fecha} · ${cap.duracion}</span>
         </div>
         <div style="display:flex;align-items:center;gap:12px;">
-          <span class="badge ${badgeClase(i.estado)}">${badgeTexto(i.estado)}</span>
+          <span style="display:inline-block;min-width:100px;text-align:center;">${badgeConVencimiento(i)}</span>
           ${accion}
         </div>
       </div>`;
-    }).join("");
+    }).join("") : `<p style="font-size:13px;color:var(--text-muted);">Aun no tienes capacitaciones asignadas.</p>`;
   }
-  render();
 
   // RF-09: el docente tambien debe poder ver las capacitaciones disponibles
   // (no asignadas) ademas de las asignadas. Es solo informativo — RF-08
   // dice que solo el admin puede asignar, el docente no se auto-inscribe.
-  const idsAsignados = new Set(misInscripciones.map(i => i.id_capacitacion));
-  const disponibles = CAPACITACIONES.filter(c => !idsAsignados.has(c.id));
+  function actualizarDisponibles(){
+    const idsAsignados = new Set(misInscripciones.map(i => i.id_capacitacion));
+    disponibles = capacitaciones.filter(c => c.activo && !idsAsignados.has(c.id));
+  }
 
   // RF-08 sigue intacto: "solicitar" nunca crea la inscripcion. Solo deja
   // una peticion visible para el administrador (patron real de "Request
   // Approval" de Frontline Professional Growth / MyLearningPlan, usados en
   // distritos escolares de EEUU) — la inscripcion la crea el admin al aprobar.
   function etiquetaSolicitud(idCap){
-    const s = solicitudDe(sesion.id, idCap);
+    const s = solicitudPorCapacitacion(idCap);
     if(!s) return `<span class="d-tag">No asignada</span>`;
     if(s.estado === "pendiente") return `<span class="d-tag" style="color:var(--warning);border-color:var(--warning);"><i class="fa-solid fa-hourglass-half"></i> Solicitud enviada</span>`;
     if(s.estado === "rechazada") return `<span class="d-tag" style="color:#8a2a1e;border-color:#8a2a1e;">No aprobada</span>`;
+    if(s.estado === "aprobada") return `<span class="d-tag" style="color:var(--success);border-color:var(--success);"><i class="fa-solid fa-circle-check"></i> Solicitud aprobada</span>`;
     return `<span class="d-tag">No asignada</span>`;
   }
 
@@ -133,26 +278,27 @@
       </div>
     `).join("") || `<p style="font-size:13px;color:var(--text-muted);">Ya tienes todas las capacitaciones disponibles asignadas.</p>`;
   }
-  renderDisponibles();
-
   function verDisponible(idCap){
-    const cap = CAPACITACIONES.find(c => c.id === idCap);
-    const s = solicitudDe(sesion.id, idCap);
+    const cap = capacitacionPorId(idCap);
+    if(!cap){ showToast("No se encontro la capacitacion.", "error"); return; }
+    const s = solicitudPorCapacitacion(idCap);
     let estadoBox;
     if(s && s.estado === "pendiente"){
       estadoBox = `<div class="requisitos-box" style="margin-bottom:1.25rem;"><i class="fa-solid fa-hourglass-half" style="color:var(--warning);"></i> Ya solicitaste esta capacitacion el ${s.fecha_solicitud}. Un administrador la revisara.</div>`;
+    } else if(s && s.estado === "aprobada"){
+      estadoBox = `<div class="requisitos-box" style="margin-bottom:1.25rem;"><i class="fa-solid fa-circle-check" style="color:var(--success);"></i> Tu solicitud fue aprobada. La inscripcion se reflejara cuando el administrador complete el flujo.</div>`;
     } else if(s && s.estado === "rechazada"){
       estadoBox = `
         <div class="requisitos-box" style="margin-bottom:1.25rem;"><i class="fa-solid fa-circle-info" style="color:#8a2a1e;"></i> Tu solicitud no fue aprobada por ahora. Puedes volver a solicitarla.</div>
         <div style="display:flex;justify-content:flex-end;margin-bottom:1rem;">
-          <button class="btn btn-primary btn-sm" onclick="solicitarCapacitacion(${cap.id})"><i class="fa-solid fa-paper-plane"></i> Volver a solicitar</button>
+          <button class="btn btn-primary btn-sm" onclick="solicitarCapacitacion(${cap.id}, this)"><i class="fa-solid fa-paper-plane"></i> Volver a solicitar</button>
         </div>
       `;
     } else {
       estadoBox = `
         <div class="requisitos-box" style="margin-bottom:1.25rem;"><i class="fa-solid fa-triangle-exclamation" style="color:var(--warning);"></i> Aun no te han asignado esta capacitacion.</div>
         <div style="display:flex;justify-content:flex-end;margin-bottom:1rem;">
-          <button class="btn btn-primary btn-sm" onclick="solicitarCapacitacion(${cap.id})"><i class="fa-solid fa-paper-plane"></i> Solicitar esta capacitacion</button>
+          <button class="btn btn-primary btn-sm" onclick="solicitarCapacitacion(${cap.id}, this)"><i class="fa-solid fa-paper-plane"></i> Solicitar esta capacitacion</button>
         </div>
       `;
     }
@@ -170,6 +316,18 @@
       <ul class="obj-list" style="margin-bottom:1rem;">
         ${(cap.objetivos || []).map(o => `<li><i class="fa-solid fa-circle-check"></i> ${o}</li>`).join("") || "<li>No especificado.</li>"}
       </ul>
+      <h4 style="font-size:12px;text-transform:uppercase;color:var(--text-muted);margin-bottom:.5rem;">Temario</h4>
+      <ul class="obj-list" style="margin-bottom:1rem;">
+        ${(cap.temario || []).map(t => `<li><i class="fa-solid fa-list-check"></i> ${t}</li>`).join("") || "<li>No especificado.</li>"}
+      </ul>
+      <h4 style="font-size:12px;text-transform:uppercase;color:var(--text-muted);margin-bottom:.5rem;">Habilidades</h4>
+      <div class="skill-tags on-light" style="margin-bottom:1rem;">
+        ${(cap.habilidades || []).map(h => `<span><i class="fa-solid fa-tag"></i> ${h}</span>`).join("") || "<span>No especificado.</span>"}
+      </div>
+      <h4 style="font-size:12px;text-transform:uppercase;color:var(--text-muted);margin-bottom:.5rem;">Instructor</h4>
+      <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:1rem;"><b>${cap.instructor || "Por confirmar"}</b> — ${cap.instructor_bio || "Informacion del instructor no disponible por el momento."}</p>
+      <h4 style="font-size:12px;text-transform:uppercase;color:var(--text-muted);margin-bottom:.5rem;">Requisitos</h4>
+      <div class="requisitos-box" style="margin-bottom:1rem;"><i class="fa-solid fa-triangle-exclamation" style="color:var(--warning);"></i> ${cap.requisitos || "Ninguno."}</div>
       ${estadoBox}
       <div style="display:flex;justify-content:flex-end;">
         <button class="btn btn-outline btn-sm" onclick="document.getElementById('modalDisponible').classList.remove('open')"><i class="fa-solid fa-xmark"></i> Cerrar</button>
@@ -178,14 +336,44 @@
     document.getElementById("modalDisponible").classList.add("open");
   }
 
-  function solicitarCapacitacion(idCap){
-    solicitarCapacitacionLocal(sesion.id, idCap);
-    showToast("Solicitud enviada. Un administrador la revisara.", "success");
-    renderDisponibles();
-    verDisponible(idCap);
-  }
+  async function solicitarCapacitacion(idCap, boton){
+    if(solicitudesEnProceso.has(idCap)){
+      showToast("La solicitud ya se esta enviando.", "error");
+      return;
+    }
 
-  activarFiltrosChip(".chip", "#listaCapacitaciones .card");
+    if(solicitudPorCapacitacion(idCap)){
+      showToast("Ya existe una solicitud para esta capacitacion.", "error");
+      verDisponible(idCap);
+      return;
+    }
+
+    solicitudesEnProceso.add(idCap);
+
+    try{
+      const solicitud = await conEstadoCarga(boton, "Enviando...", () => crearSolicitudBackend(idCap));
+      misSolicitudes = misSolicitudes.filter(s => s.id_capacitacion !== solicitud.id_capacitacion);
+      misSolicitudes.push(solicitud);
+      showToast("Solicitud enviada. Un administrador la revisara.", "success");
+      renderDisponibles();
+      verDisponible(idCap);
+    }catch(error){
+      if(error.status === 409){
+        showToast(error.message || "Ya existe una solicitud para esta capacitacion.", "error");
+        try{
+          misSolicitudes = await listarMisSolicitudesBackend();
+          renderDisponibles();
+          verDisponible(idCap);
+        }catch(e){}
+      } else if(error.status === 422){
+        showToast(error.message || "Revisa la capacitacion seleccionada.", "error");
+      } else if(error.status !== 401){
+        showToast(error.message || "No se pudo enviar la solicitud.", "error");
+      }
+    }finally{
+      solicitudesEnProceso.delete(idCap);
+    }
+  }
 
   document.getElementById("buscador").addEventListener("input", (e) => {
     const q = e.target.value.toLowerCase();
@@ -195,10 +383,11 @@
   });
 
   function verCompletada(idInscripcion){
-    const i = INSCRIPCIONES.find(x => x.id === idInscripcion);
-    const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
+    const i = inscripcionPorId(idInscripcion);
+    const cap = i ? (capacitacionPorId(i.id_capacitacion) || i.capacitacion) : null;
+    if(!cap){ showToast("No se encontro la capacitacion.", "error"); return; }
     document.getElementById("modalTexto").textContent = `Completaste "${cap.titulo}". Tu constancia ya esta disponible para descargar.`;
-    document.getElementById("linkDetalleCompletada").href = `detalle.html?id=${i.id}`;
+    document.getElementById("linkDetalleCompletada").href = `detalle.html?capacitacion=${cap.id}`;
     document.getElementById("modalCompletada").classList.add("open");
     if(typeof confetti === "function"){
       confetti({ particleCount: 110, spread: 75, origin: { y: 0.6 }, colors: ["#00205B","#64a44e","#f0ad4e","#008196"] });
@@ -220,18 +409,52 @@
         `).join("")
       : "";
   }
-  renderSugerencias();
-
-  document.getElementById("btnEnviarSugerencia").addEventListener("click", () => {
+  document.getElementById("btnEnviarSugerencia").addEventListener("click", async (evt) => {
     const titulo = document.getElementById("sugTitulo").value.trim();
     const detalle = document.getElementById("sugDetalle").value.trim();
     if(!titulo){ showToast("Escribe un tema antes de enviar", "error"); return; }
-    guardarSugerenciaLocal(sesion.id, titulo, detalle);
-    document.getElementById("sugTitulo").value = "";
-    document.getElementById("sugDetalle").value = "";
-    showToast("Sugerencia enviada. Gracias por tu aporte.", "success");
-    renderSugerencias();
+    try{
+      await conEstadoCarga(evt.currentTarget, "Enviando...", async () => {
+        await crearSugerenciaBackend(titulo, detalle);
+        await misSugerenciasBackend();
+      });
+      document.getElementById("sugTitulo").value = "";
+      document.getElementById("sugDetalle").value = "";
+      showToast("Sugerencia enviada. Gracias por tu aporte.", "success");
+      renderSugerencias();
+    }catch(error){
+      showToast(error.message || "No se pudo enviar la sugerencia.", "error");
+    }
   });
+
+  async function iniciarPagina(){
+    try{
+      capacitaciones = await listarCapacitacionesBackend();
+      misInscripciones = await listarMisInscripcionesBackend();
+      misSolicitudes = await listarMisSolicitudesBackend();
+      await misSugerenciasBackend();
+      actualizarDisponibles();
+      render();
+      renderDisponibles();
+      activarFiltrosChip(".chip", "#listaCapacitaciones .card");
+      renderSugerencias();
+
+      // Si se llega aqui desde "Capacitaciones relacionadas" (detalle.html)
+      // con ?ver=<id>, abre de una vez el modal de esa capacitacion en vez
+      // de dejar al docente buscandola a simple vista entre "Disponibles".
+      const idVer = parseInt(new URLSearchParams(window.location.search).get("ver"), 10);
+      if(Number.isInteger(idVer) && disponibles.some(c => c.id === idVer)){
+        verDisponible(idVer);
+      }
+    }catch(error){
+      document.getElementById("listaCapacitaciones").innerHTML =
+        `<p style="font-size:13px;color:#c62828;">${error.message}</p>`;
+      document.getElementById("listaDisponibles").innerHTML =
+        `<p style="font-size:13px;color:#c62828;">No se pudieron cargar las capacitaciones.</p>`;
+    }
+  }
+
+  iniciarPagina();
 </script>
 </body>
 </html>

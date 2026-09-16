@@ -10,7 +10,7 @@
 <link rel="icon" type="image/x-icon" href="../img/favicon_certus.ico">
 
 <title>CERTUS | Administradores</title>
-<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="../css/theme.css">
 </head>
 <body>
 <div class="app">
@@ -34,12 +34,10 @@
     </div>
 
     <p style="font-size:12.5px;color:var(--text-muted);margin:-.75rem 0 1rem;"><i class="fa-solid fa-circle-info"></i> RF-03/RF-05: quienes tienen acceso al panel administrador, con el mismo control de alta/edicion/baja que Gestion de docentes.</p>
-    <div class="table-scroll">
-<table>
+    <table>
       <thead><tr><th>Nombre</th><th>Correo</th><th>Telefono</th><th></th></tr></thead>
       <tbody id="tablaAdmins"></tbody>
     </table>
-</div>
   </main>
 </div>
 
@@ -53,7 +51,7 @@
     <p id="errorAdmin" style="font-size:12px;color:var(--danger);margin-bottom:.5rem;display:none;"></p>
     <div style="display:flex;gap:8px;justify-content:flex-end;">
       <button class="btn btn-outline" onclick="cerrarModal()"><i class="fa-solid fa-xmark"></i> Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarAdmin()"><i class="fa-solid fa-check"></i> Guardar</button>
+      <button class="btn btn-primary" onclick="guardarAdmin(this)"><i class="fa-solid fa-check"></i> Guardar</button>
     </div>
   </div>
 </div>
@@ -73,13 +71,13 @@
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:.5rem;">
       <button class="btn btn-outline" onclick="cerrarDesactivar()"><i class="fa-solid fa-xmark"></i> Cancelar</button>
-      <button class="btn btn-danger" onclick="confirmarDesactivar()"><i class="fa-solid fa-user-slash"></i> Desactivar</button>
+      <button class="btn btn-danger" onclick="confirmarDesactivar(this)"><i class="fa-solid fa-user-slash"></i> Desactivar</button>
     </div>
   </div>
 </div>
 
-<script src="../js/data.js"></script>
-<script src="../js/app.js"></script>
+<script src="../js/data.js?v=20260916n"></script>
+<script src="../js/app.js?v=20260916n"></script>
 <script>
   const sesionActual = requireSesion("admin");
 
@@ -87,7 +85,7 @@
 
   function render(){
     document.getElementById("tablaAdmins").innerHTML = ADMINISTRADORES.map(a => {
-      const inactivo = estadoAdmin(a.id);
+      const inactivo = !a.activo;
       return `
       <tr>
         <td>${a.nombres} ${a.apellidos} ${inactivo ? `<span class="tag-inactivo">Inactivo</span>` : ""} ${a.id === sesionActual.id ? `<span style="font-size:10px;color:var(--text-muted);">(tu)</span>` : ""}</td>
@@ -96,7 +94,7 @@
         <td style="display:flex;gap:6px;">
           <button class="btn btn-outline btn-sm" onclick="abrirEditar(${a.id})"><i class="fa-solid fa-pen"></i> Editar</button>
           ${inactivo
-            ? `<button class="btn btn-outline btn-sm" onclick="reactivarAdmin(${a.id})"><i class="fa-solid fa-rotate-left"></i> Reactivar</button>`
+            ? `<button class="btn btn-outline btn-sm" onclick="reactivarAdmin(${a.id}, this)"><i class="fa-solid fa-rotate-left"></i> Reactivar</button>`
             : `<button class="btn btn-danger btn-sm" onclick="abrirDesactivar(${a.id})" ${puedeDesactivar(a.id) ? "" : "disabled title='Debe quedar al menos un administrador activo'"}><i class="fa-solid fa-user-slash"></i> Desactivar</button>`}
         </td>
       </tr>
@@ -108,11 +106,9 @@
   // bloqueo total del sistema): no se puede desactivar al ultimo
   // administrador activo, o nadie podria volver a entrar al panel admin.
   function puedeDesactivar(idAdmin){
-    const activos = ADMINISTRADORES.filter(a => !estadoAdmin(a.id));
+    const activos = ADMINISTRADORES.filter(a => a.activo);
     return !(activos.length === 1 && activos[0].id === idAdmin);
   }
-
-  render();
 
   let docenteADesactivar = null; // reutiliza el nombre de variable del patron de gestion_docentes
   function abrirDesactivar(id){
@@ -125,18 +121,32 @@
   function cerrarDesactivar(){
     document.getElementById("modalDesactivar").classList.remove("open");
   }
-  function confirmarDesactivar(){
+  async function confirmarDesactivar(boton){
     const motivo = document.getElementById("fMotivoBaja").value;
     if(!motivo){ showToast("Elige un motivo antes de continuar", "error"); return; }
-    desactivarAdminLocal(docenteADesactivar, motivo);
-    cerrarDesactivar();
-    render();
-    showToast("Administrador desactivado.", "info");
+    try{
+      await conEstadoCarga(boton, "Desactivando...", async () => {
+        await cambiarEstadoAdministradorBackend(docenteADesactivar, false, motivo);
+        await listarAdministradoresBackend();
+      });
+      cerrarDesactivar();
+      render();
+      showToast("Administrador desactivado.", "info");
+    }catch(error){
+      showToast(error.message, "error");
+    }
   }
-  function reactivarAdmin(id){
-    reactivarAdminLocal(id);
-    render();
-    showToast("Administrador reactivado", "success");
+  async function reactivarAdmin(id, boton){
+    try{
+      await conEstadoCarga(boton, "Reactivando...", async () => {
+        await cambiarEstadoAdministradorBackend(id, true);
+        await listarAdministradoresBackend();
+      });
+      render();
+      showToast("Administrador reactivado", "success");
+    }catch(error){
+      showToast(error.message, "error");
+    }
   }
 
   let adminEnEdicion = null;
@@ -158,7 +168,7 @@
     document.getElementById("errorAdmin").style.display = "none";
     document.getElementById("modalAdmin").classList.add("open");
   }
-  function guardarAdmin(){
+  async function guardarAdmin(boton){
     const datos = {
       nombres: document.getElementById("fNombres").value.trim(),
       apellidos: document.getElementById("fApellidos").value.trim(),
@@ -178,29 +188,51 @@
       errorEl.style.display = "block";
       return;
     }
-    const correoDuplicado = ADMINISTRADORES.some(a => a.id !== adminEnEdicion && a.correo.toLowerCase() === datos.correo.toLowerCase());
-    if(correoDuplicado){
-      errorEl.textContent = "Ya existe un administrador registrado con ese correo.";
-      errorEl.style.display = "block";
-      return;
-    }
     errorEl.style.display = "none";
 
-    if(adminEnEdicion){
-      guardarAdminOverride(adminEnEdicion, datos);
-      const a = ADMINISTRADORES.find(x => x.id === adminEnEdicion);
-      Object.assign(a, datos, {editado_por: sesionActual.nombre, fecha_edicion: new Date().toISOString().slice(0,10)});
-    } else {
-      const nuevo = crearAdminLocal(datos);
-      ADMINISTRADORES.push(nuevo);
+    try{
+      if(adminEnEdicion){
+        await conEstadoCarga(boton, "Guardando...", async () => {
+          await editarAdministradorBackend(adminEnEdicion, datos);
+          await listarAdministradoresBackend();
+        });
+        cerrarModal();
+        render();
+        showToast("Administrador actualizado correctamente", "success");
+      } else {
+        const { passwordTemporal } = await conEstadoCarga(boton, "Guardando...", async () => {
+          const resultado = await crearAdministradorBackend(datos);
+          await listarAdministradoresBackend();
+          return resultado;
+        });
+        cerrarModal();
+        render();
+        showToast(
+          passwordTemporal
+            ? `Administrador creado. Contrasena temporal: ${passwordTemporal} (comparteselas de forma segura)`
+            : "Administrador creado correctamente",
+          "success"
+        );
+      }
+    }catch(error){
+      errorEl.textContent = error.message;
+      errorEl.style.display = "block";
     }
-    cerrarModal();
-    render();
-    showToast("Administrador guardado correctamente", "success");
   }
   function cerrarModal(){
     document.getElementById("modalAdmin").classList.remove("open");
   }
+
+  async function iniciarGestionAdministradores(){
+    try{
+      await listarAdministradoresBackend();
+    }catch(error){
+      showToast(error.message, "error");
+    }
+    render();
+  }
+
+  iniciarGestionAdministradores();
 </script>
 </body>
 </html>
