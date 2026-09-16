@@ -97,6 +97,9 @@
   const motivosBajaSesion = {};
   let deepLinkDocenteProcesado = false;
   let evidenciasPendientesReales = [];
+  let inscripcionesRealesGestion = [];
+  let capacitacionesRealesGestion = [];
+  let capacitacionesPorIdGestion = new Map();
 
   function iniciales(nombres, apellidos){
     return (((nombres || "?")[0] || "?") + ((apellidos || "?")[0] || "?")).toUpperCase();
@@ -239,6 +242,105 @@
     return datos;
   }
 
+  async function apiGestionArchivo(archivo){
+    const respuesta = await fetch(rutaBackendCertus(archivo), {
+      credentials: "same-origin",
+      headers: { "Accept": "application/json" }
+    });
+    let datos = null;
+
+    try{
+      datos = await respuesta.json();
+    }catch(e){
+      datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+    }
+
+    if(respuesta.status === 401 || respuesta.status === 403){
+      try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+      if(respuesta.status === 401){
+        window.location.replace(rutaLoginCertus());
+      }
+    }
+
+    if(!respuesta.ok || !datos.ok){
+      throw new Error(datos.mensaje || "No se pudo completar la operacion.");
+    }
+
+    return datos;
+  }
+
+  function normalizarCapacitacionGestion(capacitacion){
+    return {
+      ...capacitacion,
+      id: parseInt(capacitacion.id, 10),
+      titulo: capacitacion.titulo || "",
+      duracion: parseInt(capacitacion.duracion || 0, 10) || 0
+    };
+  }
+
+  function normalizarInscripcionGestion(inscripcion){
+    const docente = inscripcion.docente || {};
+    const capacitacion = inscripcion.capacitacion || {};
+
+    return {
+      id: parseInt(inscripcion.id, 10),
+      id_docente: parseInt(docente.id ?? inscripcion.id_docente, 10),
+      id_capacitacion: parseInt(capacitacion.id ?? inscripcion.id_capacitacion, 10),
+      estado: inscripcion.estado || "",
+      fecha_inscripcion: inscripcion.fecha_inscripcion || "",
+      fecha_limite: inscripcion.fecha_limite || "",
+      fecha_actualizacion: inscripcion.fecha_actualizacion || "",
+      docente,
+      capacitacion: {
+        ...capacitacion,
+        id: parseInt(capacitacion.id ?? inscripcion.id_capacitacion, 10),
+        titulo: capacitacion.titulo || ""
+      }
+    };
+  }
+
+  async function cargarDatosInscripcionesGestion(){
+    const [datosInscripciones, datosCapacitaciones] = await Promise.all([
+      apiGestionArchivo("api/inscripciones/listar.php"),
+      apiGestionArchivo("api/capacitaciones/listar.php")
+    ]);
+
+    inscripcionesRealesGestion = (datosInscripciones.inscripciones || []).map(normalizarInscripcionGestion);
+    capacitacionesRealesGestion = (datosCapacitaciones.capacitaciones || []).map(normalizarCapacitacionGestion);
+    capacitacionesPorIdGestion = new Map(capacitacionesRealesGestion.map(c => [c.id, c]));
+  }
+
+  function normalizarInsigniaGestion(insignia){
+    return {
+      ...insignia,
+      id: parseInt(insignia.id, 10),
+      ganada: Boolean(insignia.obtenida),
+      icono: insignia.codigo_icono || "",
+      requisito: insignia.requisito || "",
+      nombre: insignia.nombre || ""
+    };
+  }
+
+  async function cargarInsigniasDocenteGestion(idDocente){
+    const datos = await apiGestionArchivo(`api/insignias/docente.php?id_docente=${encodeURIComponent(idDocente)}`);
+    return (datos.insignias || []).map(normalizarInsigniaGestion);
+  }
+
+  function normalizarConstanciaGestion(constancia){
+    return {
+      ...constancia,
+      id_inscripcion: parseInt(constancia.id_inscripcion, 10),
+      codigo: constancia.codigo || "",
+      capacitacion: constancia.capacitacion || "",
+      fecha_finalizacion: constancia.fecha_finalizacion || ""
+    };
+  }
+
+  async function cargarConstanciasDocenteGestion(idDocente){
+    const datos = await apiGestionArchivo(`api/constancias/docente.php?id_docente=${encodeURIComponent(idDocente)}`);
+    return (datos.constancias || []).map(normalizarConstanciaGestion);
+  }
+
   async function cargarEvidenciasPendientes(){
     const datos = await apiEvidencias("listar_pendientes.php");
     evidenciasPendientesReales = (datos.evidencias || []).map(normalizarEvidenciaPendienteGestion);
@@ -247,6 +349,36 @@
 
   function evidenciasPendientesDocente(idDocente){
     return evidenciasPendientesReales.filter(e => e.id_docente === idDocente);
+  }
+
+  function inscripcionesDocenteGestion(idDocente){
+    return inscripcionesRealesGestion.filter(i => i.id_docente === idDocente);
+  }
+
+  function capacitacionDeInscripcionGestion(inscripcion){
+    return capacitacionesPorIdGestion.get(inscripcion.id_capacitacion) || inscripcion.capacitacion || {};
+  }
+
+  function horasAcumuladasGestion(inscripciones){
+    return inscripciones
+      .filter(i => i.estado === "completada")
+      .reduce((total, inscripcion) => {
+        const capacitacion = capacitacionDeInscripcionGestion(inscripcion);
+        return total + (parseInt(capacitacion.duracion || 0, 10) || 0);
+      }, 0);
+  }
+
+  function textoFechaHistorialGestion(inscripcion){
+    const partes = [];
+    if(inscripcion.fecha_actualizacion){
+      partes.push(`actualizado ${inscripcion.fecha_actualizacion}`);
+    } else if(inscripcion.fecha_inscripcion){
+      partes.push(`inscrito ${inscripcion.fecha_inscripcion}`);
+    }
+    if(inscripcion.fecha_limite){
+      partes.push(`limite ${inscripcion.fecha_limite}`);
+    }
+    return partes.join(" · ") || "-";
   }
 
   function estadoDocenteGestion(id){
@@ -262,6 +394,14 @@
     try{
       const datos = await apiDocentes("listar.php");
       sincronizarDocentesGestion(datos.docentes || []);
+      try{
+        await cargarDatosInscripcionesGestion();
+      }catch(errorInscripciones){
+        inscripcionesRealesGestion = [];
+        capacitacionesRealesGestion = [];
+        capacitacionesPorIdGestion = new Map();
+        showToast(errorInscripciones.message, "error");
+      }
       try{
         await cargarEvidenciasPendientes();
       }catch(errorEvidencias){
@@ -379,16 +519,32 @@
     }
   }
 
-  function abrirPerfilDocente(id){
+  async function abrirPerfilDocente(id){
     const d = DOCENTES.find(x => x.id === id);
     if(!d){ showToast("Docente no encontrado", "error"); return; }
-    const insignias = insigniasDeDocente(id);
+    let insignias = [];
+    let errorInsignias = "";
+    try{
+      insignias = await cargarInsigniasDocenteGestion(id);
+    }catch(error){
+      errorInsignias = error.message;
+      showToast(error.message, "error");
+    }
     const ganadas = insignias.filter(i => i.ganada).length;
-    const misInscripciones = INSCRIPCIONES.filter(i => i.id_docente === id);
+    let misConstancias = [];
+    let errorConstancias = "";
+    try{
+      misConstancias = await cargarConstanciasDocenteGestion(id);
+    }catch(error){
+      errorConstancias = error.message;
+      showToast(error.message, "error");
+    }
+    const misInscripciones = inscripcionesDocenteGestion(id);
     const completadas = misInscripciones.filter(i => i.estado === "completada");
     const enCurso = misInscripciones.filter(i => i.estado === "en curso");
-    const misConstancias = CONSTANCIAS.filter(c => completadas.some(i => i.id === c.id_inscripcion));
+    const pendientes = misInscripciones.filter(i => i.estado === "pendiente");
     const historial = [...misInscripciones].sort((a,b) => new Date(b.fecha_actualizacion || b.fecha_inscripcion) - new Date(a.fecha_actualizacion || a.fecha_inscripcion)).slice(0,5);
+    const horasReales = horasAcumuladasGestion(misInscripciones);
     const plan = planDeDocente(id);
     const evidenciasPendientes = evidenciasPendientesDocente(id);
     const inactivo = estadoDocenteGestion(id);
@@ -428,9 +584,10 @@
         <div><b>${misInscripciones.length}</b><span>Asignadas</span></div>
         <div><b>${completadas.length}</b><span>Completadas</span></div>
         <div><b>${enCurso.length}</b><span>En curso</span></div>
-        <div><b>${ganadas}</b><span>Insignias</span></div>
-        <div><b>${misConstancias.length}</b><span>Constancias</span></div>
-        <div><b>${horasAcumuladas(id)}/${META_HORAS_PERIODO}</b><span>Horas de PD (periodo)</span></div>
+        <div><b>${pendientes.length}</b><span>Pendientes</span></div>
+        <div><b>${ganadas}/${insignias.length}</b><span>Insignias</span></div>
+        <div><b>${errorConstancias ? "-" : misConstancias.length}</b><span>Constancias</span></div>
+        <div><b>${horasReales}/${META_HORAS_PERIODO}</b><span>Horas de PD (periodo)</span></div>
       </div>
       <p class="mentor-bio">${d.bio}</p>
       <table class="table-kv" style="margin-bottom:1.1rem;">
@@ -441,14 +598,19 @@
 
       <div class="mentor-modal-section">
         <h4><i class="fa-solid fa-award"></i> Insignias</h4>
-        <div class="insignias-grid" style="margin-bottom:1.1rem;">
-          ${insignias.map(ins => `
+        ${errorInsignias ? `
+          <p style="font-size:12.5px;color:var(--danger);margin-bottom:1.1rem;">${escaparHtml(errorInsignias)}</p>
+        ` : `
+          <p style="font-size:12px;color:var(--text-muted);margin:-.2rem 0 .65rem;">${ganadas} de ${insignias.length} insignias obtenidas.</p>
+          <div class="insignias-grid" style="margin-bottom:1.1rem;">
+            ${insignias.map(ins => `
             <div class="insignia ${ins.ganada ? "ganada" : "bloqueada"}" title="${ins.requisito || ""}">
               <div class="icono"><i class="fa-solid ${ins.ganada ? iconoInsignia(ins.icono) : "fa-lock"}"></i></div>
-              <div class="nombre">${ins.nombre}</div>
+              <div class="nombre">${escaparHtml(ins.nombre)}</div>
             </div>
-          `).join("")}
-        </div>
+            `).join("") || `<p style="font-size:12.5px;color:var(--text-muted);">No hay insignias activas para mostrar.</p>`}
+          </div>
+        `}
       </div>
 
       <div class="mentor-modal-section">
@@ -486,10 +648,10 @@
         <h4><i class="fa-solid fa-clock-rotate-left"></i> Historial reciente</h4>
         <div class="timeline">
           ${historial.map(i => {
-            const cap = CAPACITACIONES.find(c => c.id === i.id_capacitacion);
+            const cap = capacitacionDeInscripcionGestion(i);
             return `<div class="timeline-item ${i.estado === "completada" ? "" : "pend"}">
-              <b>${cap.titulo}</b>
-              <span>${badgeTexto(i.estado)} · ${i.fecha_actualizacion || i.fecha_inscripcion}</span>
+              <b>${escaparHtml(cap.titulo || i.capacitacion.titulo || "Capacitacion sin titulo")}</b>
+              <span>${badgeTexto(i.estado)} · ${escaparHtml(textoFechaHistorialGestion(i))}</span>
             </div>`;
           }).join("") || `<p style="font-size:12.5px;color:var(--text-muted);">Aun no tiene historial.</p>`}
         </div>
