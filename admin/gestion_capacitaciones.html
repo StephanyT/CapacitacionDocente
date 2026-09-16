@@ -195,6 +195,57 @@
     return (datos.inscripciones || []).map(normalizarInscripcionAdminBackend);
   }
 
+  async function listarDocentesBackend(){
+    const respuesta = await fetch("../api/docentes/listar.php", {
+      credentials: "same-origin",
+      headers: { "Accept": "application/json" }
+    });
+    let datos = null;
+
+    try{
+      datos = await respuesta.json();
+    }catch(e){
+      datos = { ok: false, mensaje: "Respuesta invalida del servidor." };
+    }
+
+    if(respuesta.status === 401 || respuesta.status === 403){
+      try{ sessionStorage.removeItem("sesion_certus"); }catch(e){}
+      if(respuesta.status === 401){
+        window.location.replace(rutaLoginCertus());
+      }
+    }
+
+    if(!respuesta.ok || !datos.ok){
+      const error = new Error(datos.mensaje || "No se pudieron cargar los docentes.");
+      error.status = respuesta.status;
+      throw error;
+    }
+
+    DOCENTES.splice(0, DOCENTES.length, ...(datos.docentes || []).map(d => ({
+      id: parseInt(d.id, 10),
+      nombres: d.nombres || "",
+      apellidos: d.apellidos || "",
+      dni: d.dni || "",
+      correo: d.correo || "",
+      telefono: d.telefono || "",
+      especialidad: d.especialidad || "",
+      anios_experiencia: parseInt(d.anios_experiencia || 0, 10),
+      bio: d.bio || "",
+      activo: parseInt(d.activo, 10) === 0 ? 0 : 1,
+      fecha_creacion: d.fecha_creacion || ""
+    })));
+
+    return DOCENTES;
+  }
+
+  async function asignarInscripcionBackend(idDocente, idCapacitacion){
+    const datos = await apiInscripciones("asignar.php", {
+      method: "POST",
+      body: {id_docente: idDocente, id_capacitacion: idCapacitacion}
+    });
+    return normalizarInscripcionAdminBackend(datos.inscripcion);
+  }
+
   async function cambiarEstadoInscripcionBackend(idInscripcion, estado){
     const datos = await apiInscripciones("cambiar_estado.php", {
       method: "POST",
@@ -258,15 +309,20 @@
   let idCapacitacionEnEdicion = null;
 
   function renderCheckDocentes(idCap){
-    const asignadosIds = idCap
-      ? INSCRIPCIONES.filter(i => i.id_capacitacion === idCap).map(i => i.id_docente)
-      : [];
-    document.getElementById("listaCheckDocentes").innerHTML = DOCENTES.map(d => `
+    const asignadosIds = new Set(idCap
+      ? inscripcionesAdmin.filter(i => i.id_capacitacion === idCap).map(i => i.id_docente)
+      : []);
+    document.getElementById("listaCheckDocentes").innerHTML = DOCENTES.length ? DOCENTES.map(d => {
+      const asignado = asignadosIds.has(d.id);
+      const inactivo = parseInt(d.activo, 10) === 0;
+      return `
       <label style="display:block;font-size:13px;margin:4px 0;">
-        <input type="checkbox" value="${d.id}" ${asignadosIds.includes(d.id) ? "checked" : ""}>
-        ${d.nombres} ${d.apellidos}
-      </label>
-    `).join("");
+        <input type="checkbox" value="${d.id}" ${asignado ? "checked" : ""} ${asignado || inactivo ? "disabled" : ""}>
+        ${escaparHTMLGestion(`${d.nombres} ${d.apellidos}`.trim())}
+        ${asignado ? `<span style="color:var(--text-muted);">- Asignado</span>` : ""}
+        ${!asignado && inactivo ? `<span style="color:var(--text-muted);">- Inactivo</span>` : ""}
+      </label>`;
+    }).join("") : `<p style="font-size:13px;color:var(--text-muted);">No hay docentes disponibles.</p>`;
   }
 
   function abrirNueva(){
@@ -333,22 +389,26 @@
       capacitaciones.push(creada);
     }
 
-    // RF-08: asignar la capacitacion a los docentes marcados
-    const marcados = Array.from(document.querySelectorAll("#listaCheckDocentes input:checked")).map(el => parseInt(el.value));
-    marcados.forEach(idDoc => {
-      const yaExiste = INSCRIPCIONES.some(i => i.id_docente === idDoc && i.id_capacitacion === idCap);
-      if(!yaExiste){
-        const nuevoId = Math.max(0, ...INSCRIPCIONES.map(i => i.id)) + 1;
-        INSCRIPCIONES.push({
-          id: nuevoId, id_docente: idDoc, id_capacitacion: idCap,
-          estado: "pendiente", fecha_inscripcion: new Date().toISOString().slice(0,10),
-          fecha_limite: datos.fecha
-        });
-      }
-    });
+    // RF-08: asignar la capacitacion a los docentes marcados en MySQL.
+    const marcados = Array.from(document.querySelectorAll("#listaCheckDocentes input:checked")).map(el => parseInt(el.value, 10));
+    const asignadosIds = new Set(inscripcionesAdmin
+      .filter(i => i.id_capacitacion === idCap)
+      .map(i => i.id_docente));
+    const nuevosDocentes = marcados.filter(idDoc => !asignadosIds.has(idDoc));
+
+    for(const idDoc of nuevosDocentes){
+      await asignarInscripcionBackend(idDoc, idCap);
+    }
+
+    inscripcionesAdmin = await listarInscripcionesAdminBackend();
 
     cerrarModales();
-    showToast("Capacitacion guardada correctamente", "success");
+    showToast(
+      nuevosDocentes.length
+        ? `Capacitacion guardada correctamente. ${nuevosDocentes.length} docente(s) asignado(s) como pendiente.`
+        : "Capacitacion guardada correctamente",
+      "success"
+    );
     }catch(error){
       showToast(error.message, "error");
     }
@@ -680,6 +740,7 @@
   async function cargarCapacitacionesAdmin(){
     try{
       capacitaciones = await listarCapacitacionesBackend();
+      await listarDocentesBackend();
       inscripcionesAdmin = await listarInscripcionesAdminBackend();
       solicitudesCapacitacion = await listarSolicitudesAdminBackend();
       render();
