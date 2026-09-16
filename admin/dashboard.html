@@ -60,6 +60,29 @@
 <script>
   const sesion = requireSesion("admin");
 
+  async function listarEvidenciasPendientesBackend(){
+    const respuesta = await fetch("../api/evidencias/listar_pendientes.php", {
+      headers: { "Accept": "application/json" }
+    });
+    const datos = await respuesta.json();
+
+    if(!respuesta.ok || !datos.ok){
+      throw new Error(datos.mensaje || "No se pudieron cargar las evidencias pendientes.");
+    }
+
+    return Array.isArray(datos.evidencias) ? datos.evidencias : [];
+  }
+
+  function nombreDocenteEvidencia(evidencia){
+    if(evidencia.docente && evidencia.docente.nombre_completo){
+      return evidencia.docente.nombre_completo;
+    }
+    if(evidencia.docente){
+      return `${evidencia.docente.nombres || ""} ${evidencia.docente.apellidos || ""}`.trim() || "Docente";
+    }
+    return nombreDocente(evidencia.id_docente);
+  }
+
   async function iniciarDashboard(){
   try{
   const capacitaciones = await listarCapacitacionesBackend();
@@ -107,13 +130,18 @@
   // Antes de esto, un admin tenia que entrar a "Gestion de capacitaciones"
   // (solicitudes y sugerencias) Y abrir uno por uno cada perfil de docente
   // en "Gestion de docentes" (evidencias) para enterarse de que habia algo
-  // pendiente de revisar. Las 3 funciones ya existian en app.js, pero
-  // todasLasEvidenciasPendientes() nunca se llamaba desde ninguna pagina.
+  // pendiente de revisar. Solicitudes y sugerencias siguen con el flujo actual,
+  // pero evidencias ya se leen desde MySQL para reflejar la cola real.
   // Patron: bandeja de aprobaciones al frente del dashboard, como en
   // Frontline Central / MyLearningPlan (EE.UU.).
   const solicitudesPend = todasLasSolicitudesPendientes();
   const sugerenciasPend = todasLasSugerencias().filter(s => s.estado !== "atendida");
-  const evidenciasPend = todasLasEvidenciasPendientes();
+  let evidenciasPend = [];
+  try {
+    evidenciasPend = await listarEvidenciasPendientesBackend();
+  } catch(errorEvidencias) {
+    showToast(errorEvidencias.message, "error");
+  }
   const totalPendiente = solicitudesPend.length + sugerenciasPend.length + evidenciasPend.length;
 
   const cardAcciones = document.getElementById("cardAccionesPendientes");
@@ -145,7 +173,7 @@
         <div class="review-item">
           <div class="r-head"><span><i class="fa-solid fa-file-circle-check"></i> Evidencias de insignias por revisar</span><span class="badge badge-pendiente">${evidenciasPend.length}</span></div>
           <p>
-            ${evidenciasPend.map(e => `<a href="gestion_docentes.html?docente=${e.id_docente}" style="color:var(--info);">${nombreDocente(e.id_docente)}</a>`).join(", ")}
+            ${evidenciasPend.map(e => `<a href="gestion_docentes.html?docente=${e.id_docente}" style="color:var(--info);">${nombreDocenteEvidencia(e)}</a>`).join(", ")}
           </p>
         </div>
       `);

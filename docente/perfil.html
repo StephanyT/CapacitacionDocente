@@ -227,9 +227,31 @@
       return datos.docente;
     }
 
+    async function cargarInsigniasDesdeBackend() {
+      const respuesta = await fetch("../api/insignias/mis_insignias.php", {
+        headers: { "Accept": "application/json" }
+      });
+      const datos = await respuesta.json();
+
+      if (!respuesta.ok || !datos.ok) {
+        throw new Error(datos.mensaje || "No se pudieron cargar tus insignias.");
+      }
+
+      return Array.isArray(datos.insignias) ? datos.insignias.map(insignia => ({
+        ...insignia,
+        ganada: Boolean(insignia.obtenida),
+        icono: insignia.codigo_icono || ""
+      })) : [];
+    }
+
     async function iniciarPerfil() {
       docente = await cargarDocenteDesdeBackend();
-      insignias = insigniasDeDocente(sesion.id);
+      try {
+        insignias = await cargarInsigniasDesdeBackend();
+      } catch (error) {
+        insignias = [];
+        showToast(error.message, "error");
+      }
       ganadas = insignias.filter(i => i.ganada).length;
 
       const misInscripciones = INSCRIPCIONES.filter(i => i.id_docente === sesion.id);
